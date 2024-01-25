@@ -1,0 +1,33 @@
+[build-system]
+requires = [
+  "scikit-build-core",
+  "nanobind",
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "nanopandas"
+version = "0.0.1.dev"
+description = "Nano implementation of pandas arrays"
+license = {file = "LICENSE"}
+readme = "README.md"
+authors = [
+    { name = "Will Ayd", email = "william.ayd@icloud.com" },
+]
+requires-python = ">=3.9"
+classifiers = [
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.urls]
+Source = "https://github.com/willayd/nanopandas"
+
+[project.scripts]
+# Add your scripts here
+
+[tool.cibuildwheel]
+build = "cp39-*64 cp310-*64 cp311-*64 cp312-*64"
