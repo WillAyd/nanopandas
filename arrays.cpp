@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <set>
 
 #include "nanoarrow/nanoarrow.h"
@@ -84,6 +85,25 @@ public:
     return StringArray{result};
   }
 
+  StringArray upper() {
+    std::vector<std::optional<std::string>> result;
+    const auto n = array_->length;
+
+    result.reserve(n);
+    for (int64_t i = 0; i < n; i++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), i)) {
+        result.push_back(std::nullopt);
+      } else {
+        const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
+        std::string value{sv.data, static_cast<size_t>(sv.size_bytes)};
+        std::transform(value.begin(), value.end(), value.begin(), ::toupper);
+        result.push_back(value);
+      }
+    }
+
+    return StringArray{result};
+  }
+
   std::vector<std::optional<std::string_view>> to_pylist() {
     const auto n = array_->length;
 
@@ -117,5 +137,6 @@ NB_MODULE(nanopandas, m) {
       .def("any", &StringArray::any)
       .def("all", &StringArray::all)
       .def("unique", &StringArray::unique)
+      .def("upper", &StringArray::upper)
       .def("to_pylist", &StringArray::to_pylist);
 }
