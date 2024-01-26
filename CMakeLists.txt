@@ -38,5 +38,8 @@ else()
   message("Could not find clang-tidy installation - checks disabled")
 endif()
 
-nanobind_add_module(nanopandas arrays.cpp)
-
+nanobind_add_module(nanopandas NOMINSIZE arrays.cpp)
+target_link_libraries(nanopandas PRIVATE nanoarrow)
+set_target_properties(nanoarrow
+                      PROPERTIES POSITION_INDEPENDENT_CODE
+                      ON)
