@@ -108,8 +108,6 @@ private:
   nanoarrow::UniqueArrayView array_view_;
 };
 
-int add(int a, int b) { return a + b; }
-
 NB_MODULE(nanopandas, m) {
   nb::class_<StringArray>(m, "StringArray")
       .def(nb::init<std::vector<std::optional<std::string_view>>>())
