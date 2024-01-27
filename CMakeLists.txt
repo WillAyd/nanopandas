@@ -31,6 +31,12 @@ FetchContent_Declare(nanoarrow-project
 )
 FetchContent_MakeAvailable(nanoarrow-project)
 
+FetchContent_Declare(utf8proc-project
+  GIT_REPOSITORY https://github.com/JuliaStrings/utf8proc
+  GIT_TAG v2.9.0
+)
+FetchContent_MakeAvailable(utf8proc-project)
+
 find_program(CLANG_TIDY_EXE NAMES "clang-tidy")
 if (CLANG_TIDY_EXE_FOUND)
   set(CLANG_TIDY_COMMAND "${CLANG_TIDY_EXE}" "-checks=-*,modernize-*")
@@ -39,7 +45,10 @@ else()
 endif()
 
 nanobind_add_module(nanopandas NOMINSIZE arrays.cpp)
-target_link_libraries(nanopandas PRIVATE nanoarrow)
+target_link_libraries(nanopandas
+  PRIVATE nanoarrow
+  PRIVATE utf8proc
+)
 set_target_properties(nanoarrow
                       PROPERTIES POSITION_INDEPENDENT_CODE
                       ON)

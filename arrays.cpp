@@ -1,8 +1,9 @@
 #include <algorithm>
 #include <set>
 
-#include "nanoarrow/nanoarrow.h"
-#include "nanoarrow/nanoarrow_types.h"
+#include <nanoarrow/nanoarrow.h>
+#include <nanoarrow/nanoarrow_types.h>
+#include <utf8proc.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
@@ -10,7 +11,7 @@
 #include <nanobind/stl/vector.h>
 
 #include <nanoarrow/nanoarrow.hpp>
-#include <stdexcept>
+
 
 namespace nb = nanobind;
 
@@ -96,7 +97,7 @@ public:
       } else {
         const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
         std::string value{sv.data, static_cast<size_t>(sv.size_bytes)};
-        std::transform(value.begin(), value.end(), value.begin(), ::toupper);
+        std::transform(value.begin(), value.end(), value.begin(), utf8proc_toupper);
         result.push_back(value);
       }
     }
