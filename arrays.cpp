@@ -1,17 +1,15 @@
 #include <algorithm>
 #include <set>
 
-#include <nanoarrow/nanoarrow.h>
 #include <nanoarrow/nanoarrow_types.h>
-#include <utf8proc.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
 #include <nanobind/stl/vector.h>
+#include <utf8proc.h>
 
 #include <nanoarrow/nanoarrow.hpp>
-
 
 namespace nb = nanobind;
 
@@ -96,8 +94,26 @@ public:
         result.push_back(std::nullopt);
       } else {
         const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
-        std::string value{sv.data, static_cast<size_t>(sv.size_bytes)};
-        std::transform(value.begin(), value.end(), value.begin(), utf8proc_toupper);
+        std::vector<utf8proc_uint8_t> dst;
+        dst.reserve(static_cast<size_t>(sv.size_bytes));
+
+        size_t bytes_read = 0;
+        size_t bytes_rem;
+        while ((bytes_rem = static_cast<size_t>(sv.size_bytes) - bytes_read) >
+               0) {
+          utf8proc_int32_t codepoint;
+          size_t codepoint_bytes = utf8proc_iterate(
+              reinterpret_cast<const utf8proc_uint8_t *>(sv.data + bytes_read),
+              bytes_rem, &codepoint);
+          bytes_read += codepoint_bytes;
+          utf8proc_int32_t codepoint_upper = utf8proc_toupper(codepoint);
+
+          std::array<utf8proc_uint8_t, 4> encoded;
+          utf8proc_encode_char(codepoint_upper, encoded.data());
+          dst.insert(dst.end(), encoded.begin(),
+                     encoded.begin() + codepoint_bytes);
+        }
+        std::string value{dst.begin(), dst.end()};
         result.push_back(value);
       }
     }
