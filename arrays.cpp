@@ -113,8 +113,7 @@ public:
           dst.insert(dst.end(), encoded.begin(),
                      encoded.begin() + codepoint_bytes);
         }
-        std::string value{dst.begin(), dst.end()};
-        result.push_back(value);
+        result.push_back(std::string{dst.begin(), dst.end()});
       }
     }
 
