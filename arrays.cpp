@@ -213,11 +213,11 @@ public:
   }
 
   std::vector<ssize_t> find(const std::string &string, size_t start,
-                           size_t end) {
+                            size_t end) {
     throw std::runtime_error("not implemented");
   }
   std::vector<ssize_t> rfind(const std::string &string, size_t start,
-                            size_t end) {
+                             size_t end) {
     throw std::runtime_error("not implemented");
   }
 
@@ -273,7 +273,57 @@ public:
   StringArray swapcase() { throw std::runtime_error("not implemented"); }
   StringArray normalize() { throw std::runtime_error("not implemented"); }
   StringArray translate() { throw std::runtime_error("not implemented"); }
-  std::vector<bool> isalnum() { throw std::runtime_error("not implemented"); }
+
+  std::vector<std::optional<bool>> isalnum() {
+    std::vector<std::optional<bool>> result;
+    const auto n = array_->length;
+
+    result.reserve(n);
+    for (int64_t i = 0; i < n; i++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), i)) {
+        result.push_back(std::nullopt);
+      } else {
+        const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
+
+        size_t bytes_read = 0;
+        size_t bytes_rem;
+
+        bool is_only_alnum = true;
+        while ((bytes_rem = static_cast<size_t>(sv.size_bytes) - bytes_read) >
+               0) {
+          utf8proc_int32_t codepoint;
+          size_t codepoint_bytes = utf8proc_iterate(
+              reinterpret_cast<const utf8proc_uint8_t *>(sv.data + bytes_read),
+              bytes_rem, &codepoint);
+
+          const utf8proc_category_t category = utf8proc_category(codepoint);
+
+          // we include modifier/other categories here - should we?
+
+          if ((category == UTF8PROC_CATEGORY_LU) ||
+              (category == UTF8PROC_CATEGORY_LL) ||
+              (category == UTF8PROC_CATEGORY_LT) ||
+              (category == UTF8PROC_CATEGORY_LM) ||
+              (category == UTF8PROC_CATEGORY_LO) ||
+              (category == UTF8PROC_CATEGORY_ND) ||
+              (category == UTF8PROC_CATEGORY_NL) ||
+              (category == UTF8PROC_CATEGORY_NO)) {
+            // continue along
+          } else {
+            is_only_alnum = false;
+            break;
+          }
+
+          bytes_read += codepoint_bytes;
+        }
+
+        result.push_back(is_only_alnum);
+      }
+    }
+
+    return result;
+  }
+
   std::vector<bool> isalpha() { throw std::runtime_error("not implemented"); }
   std::vector<bool> isdigit() { throw std::runtime_error("not implemented"); }
   std::vector<bool> isspace() { throw std::runtime_error("not implemented"); }
