@@ -67,35 +67,167 @@ public:
     }
   }
 
-  int64_t size() { return array_->length; }
-
-  int64_t nbytes() {
-    struct ArrowBuffer *data_buffer = ArrowArrayBuffer(array_.get(), 1);
-    return data_buffer->size_bytes;
+  StringArray cat() { throw std::runtime_error("not implemented"); }
+  std::vector<std::vector<std::string>> split() {
+    throw std::runtime_error("not implemented");
+  }
+  std::vector<std::vector<std::string>> rsplit() {
+    throw std::runtime_error("not implemented");
+  }
+  std::vector<char> get(size_t position) {
+    throw std::runtime_error("not implemented");
+  }
+  std::vector<std::vector<std::string>> join() {
+    throw std::runtime_error("not implemented");
+  }
+  StringArray get_dummies() { throw std::runtime_error("not implemented"); }
+  std::vector<bool> contains() { throw std::runtime_error("not implemented"); }
+  StringArray replace() { throw std::runtime_error("not implemented"); }
+  StringArray removeprefix(const std::string &prefix) {
+    throw std::runtime_error("not implemented");
+  }
+  StringArray removesuffix(const std::string &suffix) {
+    throw std::runtime_error("not implemented");
+  }
+  StringArray repeat(size_t repeats) {
+    throw std::runtime_error("not implemented");
+  }
+  StringArray pad(size_t width, const std::string &side, char fillchar) {
+    throw std::runtime_error("not implemented");
+  }
+  StringArray center(size_t width, char fillchar) {
+    throw std::runtime_error("not implemented");
+  }
+  StringArray ljust(size_t width, char fillchar) {
+    throw std::runtime_error("not implemented");
+  }
+  StringArray rjust(size_t width, char fillchar) {
+    throw std::runtime_error("not implemented");
+  }
+  StringArray zfill(size_t width) {
+    throw std::runtime_error("not implemented");
+  }
+  StringArray wrap(size_t width) {
+    throw std::runtime_error("not implemented");
+  }
+  StringArray slice(ssize_t start, ssize_t stop, ssize_t step) {
+    throw std::runtime_error("not implemented");
+  }
+  StringArray slice_replace(ssize_t start, ssize_t stop, char repl) {
+    throw std::runtime_error("not implemented");
+  }
+  std::vector<size_t> count() { throw std::runtime_error("not implemented"); }
+  std::vector<bool> startswith() {
+    throw std::runtime_error("not implemented");
+  }
+  std::vector<bool> endswith() { throw std::runtime_error("not implemented"); }
+  std::vector<std::vector<std::string>> findall() {
+    throw std::runtime_error("not implemented");
+  }
+  std::vector<std::vector<std::string>> match() {
+    throw std::runtime_error("not implemented");
+  }
+  std::vector<std::vector<std::string>> extract() {
+    throw std::runtime_error("not implemented");
+  }
+  std::vector<std::vector<std::string>> extractall() {
+    throw std::runtime_error("not implemented");
+  }
+  std::vector<size_t> len() { throw std::runtime_error("not implemented"); }
+  StringArray strip() { throw std::runtime_error("not implemented"); }
+  StringArray rstrip() { throw std::runtime_error("not implemented"); }
+  StringArray lstrip() { throw std::runtime_error("not implemented"); }
+  std::vector<std::vector<std::string>> partition() {
+    throw std::runtime_error("not implemented");
+  }
+  std::vector<std::vector<std::string>> rpartition() {
+    throw std::runtime_error("not implemented");
   }
 
-  std::string dtype() { return std::string("large_string[nanoarrow]"); }
-
-  bool any() { return array_->length > array_->null_count; }
-  bool all() { return array_->null_count == 0; }
-
-  StringArray unique() {
-    // TODO: this should never be optional in unique; simply required by current
-    // constructor but there is probably a smarter way to template that
-    std::set<std::optional<std::string>> result;
+  StringArray lower() {
+    std::vector<std::optional<std::string>> result;
     const auto n = array_->length;
 
+    result.reserve(n);
     for (int64_t i = 0; i < n; i++) {
       if (ArrowArrayViewIsNull(array_view_.get(), i)) {
-        continue;
-      }
+        result.push_back(std::nullopt);
+      } else {
+        const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
+        unsigned char *dst;
 
-      const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
-      const std::string value{sv.data, static_cast<size_t>(sv.size_bytes)};
-      result.insert(value);
+        const ssize_t nbytes = utf8proc_map_custom(
+            reinterpret_cast<const uint8_t *>(sv.data), sv.size_bytes, &dst,
+            UTF8PROC_STABLE, utf8proc_tolower_wrapper, NULL);
+        if (nbytes < 0) {
+          throw std::runtime_error("error occurred converting tolower!");
+        }
+
+        // utf8proc and std::string but malloc on the heap; maybe we could avoid
+        // a second malloc with a StringArray constructor for raw C pointers
+        std::string converted{};
+        converted.resize(nbytes);
+        memcpy(&converted[0], dst, nbytes);
+        free(dst);
+
+        result.push_back(std::move(converted));
+      }
     }
 
     return StringArray{result};
+  }
+
+  StringArray casefold() { throw std::runtime_error("not implemented"); }
+
+  StringArray upper() {
+    std::vector<std::optional<std::string>> result;
+    const auto n = array_->length;
+
+    result.reserve(n);
+    for (int64_t i = 0; i < n; i++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), i)) {
+        result.push_back(std::nullopt);
+      } else {
+        const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
+        unsigned char *dst;
+
+        const ssize_t nbytes = utf8proc_map_custom(
+            reinterpret_cast<const uint8_t *>(sv.data), sv.size_bytes, &dst,
+            UTF8PROC_STABLE, utf8proc_toupper_wrapper, NULL);
+        if (nbytes < 0) {
+          throw std::runtime_error("error occurred converting toupper!");
+        }
+
+        // utf8proc and std::string but malloc on the heap; maybe we could avoid
+        // a second malloc with a StringArray constructor for raw C pointers
+        std::string converted{};
+        converted.resize(nbytes);
+        memcpy(&converted[0], dst, nbytes);
+        free(dst);
+
+        result.push_back(std::move(converted));
+      }
+    }
+
+    return StringArray{result};
+  }
+
+  std::vector<size_t> find(const std::string &string, size_t start,
+                           size_t end) {
+    throw std::runtime_error("not implemented");
+  }
+  std::vector<size_t> rfind(const std::string &string, size_t start,
+                            size_t end) {
+    throw std::runtime_error("not implemented");
+  }
+
+  std::vector<size_t> index(const std::string &string, size_t start,
+                            size_t end) {
+    throw std::runtime_error("not implemented");
+  }
+  std::vector<size_t> rindex(const std::string &string, size_t start,
+                             size_t end) {
+    throw std::runtime_error("not implemented");
   }
 
   StringArray capitalize() {
@@ -138,67 +270,46 @@ public:
     return StringArray{result};
   }
 
-  StringArray lower() {
-    std::vector<std::optional<std::string>> result;
-    const auto n = array_->length;
+  StringArray swapcase() { throw std::runtime_error("not implemented"); }
+  StringArray normalize() { throw std::runtime_error("not implemented"); }
+  StringArray translate() { throw std::runtime_error("not implemented"); }
+  std::vector<bool> isalnum() { throw std::runtime_error("not implemented"); }
+  std::vector<bool> isalpha() { throw std::runtime_error("not implemented"); }
+  std::vector<bool> isdigit() { throw std::runtime_error("not implemented"); }
+  std::vector<bool> isspace() { throw std::runtime_error("not implemented"); }
+  std::vector<bool> islower() { throw std::runtime_error("not implemented"); }
+  std::vector<bool> isupper() { throw std::runtime_error("not implemented"); }
+  std::vector<bool> istitle() { throw std::runtime_error("not implemented"); }
+  std::vector<bool> isnumeric() { throw std::runtime_error("not implemented"); }
+  std::vector<bool> isdecimal() { throw std::runtime_error("not implemented"); }
 
-    result.reserve(n);
-    for (int64_t i = 0; i < n; i++) {
-      if (ArrowArrayViewIsNull(array_view_.get(), i)) {
-        result.push_back(std::nullopt);
-      } else {
-        const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
-        unsigned char *dst;
+  // Misc extras
+  int64_t size() { return array_->length; }
 
-        const ssize_t nbytes = utf8proc_map_custom(
-            reinterpret_cast<const uint8_t *>(sv.data), sv.size_bytes, &dst,
-            UTF8PROC_STABLE, utf8proc_tolower_wrapper, NULL);
-        if (nbytes < 0) {
-          throw std::runtime_error("error occurred converting tolower!");
-        }
-
-        // utf8proc and std::string but malloc on the heap; maybe we could avoid
-        // a second malloc with a StringArray constructor for raw C pointers
-        std::string converted{};
-        converted.resize(nbytes);
-        memcpy(&converted[0], dst, nbytes);
-        free(dst);
-
-        result.push_back(std::move(converted));
-      }
-    }
-
-    return StringArray{result};
+  int64_t nbytes() {
+    struct ArrowBuffer *data_buffer = ArrowArrayBuffer(array_.get(), 1);
+    return data_buffer->size_bytes;
   }
 
-  StringArray upper() {
-    std::vector<std::optional<std::string>> result;
+  std::string dtype() { return std::string("large_string[nanoarrow]"); }
+
+  bool any() { return array_->length > array_->null_count; }
+  bool all() { return array_->null_count == 0; }
+
+  StringArray unique() {
+    // TODO: this should never be optional in unique; simply required by current
+    // constructor but there is probably a smarter way to template that
+    std::set<std::optional<std::string>> result;
     const auto n = array_->length;
 
-    result.reserve(n);
     for (int64_t i = 0; i < n; i++) {
       if (ArrowArrayViewIsNull(array_view_.get(), i)) {
-        result.push_back(std::nullopt);
-      } else {
-        const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
-        unsigned char *dst;
-
-        const ssize_t nbytes = utf8proc_map_custom(
-            reinterpret_cast<const uint8_t *>(sv.data), sv.size_bytes, &dst,
-            UTF8PROC_STABLE, utf8proc_toupper_wrapper, NULL);
-        if (nbytes < 0) {
-          throw std::runtime_error("error occurred converting toupper!");
-        }
-
-        // utf8proc and std::string but malloc on the heap; maybe we could avoid
-        // a second malloc with a StringArray constructor for raw C pointers
-        std::string converted{};
-        converted.resize(nbytes);
-        memcpy(&converted[0], dst, nbytes);
-        free(dst);
-
-        result.push_back(std::move(converted));
+        continue;
       }
+
+      const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
+      const std::string value{sv.data, static_cast<size_t>(sv.size_bytes)};
+      result.insert(value);
     }
 
     return StringArray{result};
@@ -228,17 +339,69 @@ private:
   nanoarrow::UniqueArrayView array_view_;
 };
 
+// try to match all pandas methods
+// https://pandas.pydata.org/pandas-docs/stable/user_guide/text.html#method-summary
 NB_MODULE(nanopandas, m) {
   nb::class_<StringArray>(m, "StringArray")
       .def(nb::init<std::vector<std::optional<std::string_view>>>())
+      .def("cat", &StringArray::cat)
+      .def("split", &StringArray::split)
+      .def("rsplit", &StringArray::rsplit)
+      .def("get", &StringArray::get)
+      .def("join", &StringArray::join)
+      .def("get_dummies", &StringArray::get_dummies)
+      .def("contains", &StringArray::contains)
+      .def("replace", &StringArray::replace)
+      .def("removeprefix", &StringArray::removeprefix)
+      .def("removesuffix", &StringArray::removesuffix)
+      .def("repeat", &StringArray::repeat)
+      .def("pad", &StringArray::pad)
+      .def("center", &StringArray::center)
+      .def("ljust", &StringArray::ljust)
+      .def("rjust", &StringArray::rjust)
+      .def("zfill", &StringArray::zfill)
+      .def("wrap", &StringArray::wrap)
+      .def("slice", &StringArray::slice)
+      .def("slice_replace", &StringArray::slice_replace)
+      .def("count", &StringArray::count)
+      .def("startswith", &StringArray::startswith)
+      .def("endswith", &StringArray::endswith)
+      .def("findall", &StringArray::findall)
+      .def("match", &StringArray::match)
+      .def("extract", &StringArray::extract)
+      .def("extractall", &StringArray::extractall)
+      .def("len", &StringArray::len)
+      .def("strip", &StringArray::strip)
+      .def("rstrip", &StringArray::rstrip)
+      .def("lstrip", &StringArray::lstrip)
+      .def("partition", &StringArray::partition)
+      .def("rpartition", &StringArray::rpartition)
+      .def("lower", &StringArray::lower)
+      .def("casefold", &StringArray::casefold)
+      .def("upper", &StringArray::upper)
+      .def("find", &StringArray::find)
+      .def("rfind", &StringArray::rfind)
+      .def("index", &StringArray::rindex)
+      .def("capitalize", &StringArray::capitalize)
+      .def("swapcase", &StringArray::swapcase)
+      .def("normalize", &StringArray::normalize)
+      .def("translate", &StringArray::translate)
+      .def("isalnum", &StringArray::isalnum)
+      .def("isalpha", &StringArray::isalpha)
+      .def("isdigit", &StringArray::isdigit)
+      .def("isspace", &StringArray::isspace)
+      .def("islower", &StringArray::islower)
+      .def("isupper", &StringArray::isupper)
+      .def("istitle", &StringArray::istitle)
+      .def("isnumeric", &StringArray::isnumeric)
+      .def("isdecimal", &StringArray::isdecimal)
+
+      // some extras that may be useful
       .def_prop_ro("size", &StringArray::size)
       .def_prop_ro("nbytes", &StringArray::nbytes)
       .def_prop_ro("dtype", &StringArray::dtype)
       .def("any", &StringArray::any)
       .def("all", &StringArray::all)
       .def("unique", &StringArray::unique)
-      .def("capitalize", &StringArray::capitalize)
-      .def("lower", &StringArray::lower)
-      .def("upper", &StringArray::upper)
       .def("to_pylist", &StringArray::to_pylist);
 }
