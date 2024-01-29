@@ -25,3 +25,13 @@ Usage:
 >>> arr.unique().to_pylist()
 ['bar', 'baz', 'foo']
 ```
+
+Note that we use utf8proc for string handling:
+
+```python
+>>> import nanopandas as nanopd
+>>> arr = nanopd.StringArray(["üàéµ"])
+>>> arr.upper().to_pylist()
+['ÜÀÉΜ']
+>>> arr.capitalize().to_pylist()
+['Üàéµ']
