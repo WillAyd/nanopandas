@@ -212,11 +212,11 @@ public:
     return StringArray{result};
   }
 
-  std::vector<size_t> find(const std::string &string, size_t start,
+  std::vector<ssize_t> find(const std::string &string, size_t start,
                            size_t end) {
     throw std::runtime_error("not implemented");
   }
-  std::vector<size_t> rfind(const std::string &string, size_t start,
+  std::vector<ssize_t> rfind(const std::string &string, size_t start,
                             size_t end) {
     throw std::runtime_error("not implemented");
   }
