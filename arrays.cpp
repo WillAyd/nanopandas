@@ -11,7 +11,21 @@
 
 #include <nanoarrow/nanoarrow.hpp>
 
+static_assert(std::is_same_v<std::uint8_t, char> ||
+                  std::is_same_v<std::uint8_t, unsigned char>,
+              "uint8_t must be a typedef for char or unsigned char");
+
 namespace nb = nanobind;
+
+static utf8proc_int32_t utf8proc_toupper_wrapper(utf8proc_int32_t codepoint,
+                                                 void *data) {
+  return utf8proc_toupper(codepoint);
+}
+
+static utf8proc_int32_t utf8proc_tolower_wrapper(utf8proc_int32_t codepoint,
+                                                 void *data) {
+  return utf8proc_tolower(codepoint);
+}
 
 class StringArray {
 public:
@@ -106,46 +120,10 @@ public:
               reinterpret_cast<const utf8proc_uint8_t *>(sv.data + bytes_read),
               bytes_rem, &codepoint);
 
-          if (bytes_read == 0) { // maybe not the best impl, but easier to template with upper
+          if (bytes_read ==
+              0) { // maybe not the best impl, but easier to template with upper
             codepoint = utf8proc_toupper(codepoint);
           }
-          bytes_read += codepoint_bytes;          
-
-          std::array<utf8proc_uint8_t, 4> encoded;
-          utf8proc_encode_char(codepoint, encoded.data());
-          dst.insert(dst.end(), encoded.begin(),
-                     encoded.begin() + codepoint_bytes);
-        }
-        result.push_back(std::string{dst.begin(), dst.end()});
-      }
-    }
-
-    return StringArray{result};    
-  }
-
-  StringArray lower() {
-    std::vector<std::optional<std::string>> result;
-    const auto n = array_->length;
-
-    result.reserve(n);
-    for (int64_t i = 0; i < n; i++) {
-      if (ArrowArrayViewIsNull(array_view_.get(), i)) {
-        result.push_back(std::nullopt);
-      } else {
-        const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
-        std::vector<utf8proc_uint8_t> dst;
-        dst.reserve(static_cast<size_t>(sv.size_bytes));
-
-        size_t bytes_read = 0;
-        size_t bytes_rem;
-        while ((bytes_rem = static_cast<size_t>(sv.size_bytes) - bytes_read) >
-               0) {
-          utf8proc_int32_t codepoint;
-          size_t codepoint_bytes = utf8proc_iterate(
-              reinterpret_cast<const utf8proc_uint8_t *>(sv.data + bytes_read),
-              bytes_rem, &codepoint);
-
-          codepoint = utf8proc_tolower(codepoint);
           bytes_read += codepoint_bytes;
 
           std::array<utf8proc_uint8_t, 4> encoded;
@@ -159,7 +137,39 @@ public:
 
     return StringArray{result};
   }
-  
+
+  StringArray lower() {
+    std::vector<std::optional<std::string>> result;
+    const auto n = array_->length;
+
+    result.reserve(n);
+    for (int64_t i = 0; i < n; i++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), i)) {
+        result.push_back(std::nullopt);
+      } else {
+        const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
+        unsigned char *dst;
+
+        const ssize_t nbytes = utf8proc_map_custom(
+            reinterpret_cast<const uint8_t *>(sv.data), sv.size_bytes, &dst,
+            UTF8PROC_STABLE, utf8proc_tolower_wrapper, NULL);
+        if (nbytes < 0) {
+          throw std::runtime_error("error occurred converting tolower!");
+        }
+
+        // utf8proc and std::string but malloc on the heap; maybe we could avoid
+        // a second malloc with a StringArray constructor for raw C pointers
+        std::string converted{};
+        converted.resize(nbytes);
+        memcpy(&converted[0], dst, nbytes);
+        free(dst);
+
+        result.push_back(std::move(converted));
+      }
+    }
+
+    return StringArray{result};
+  }
 
   StringArray upper() {
     std::vector<std::optional<std::string>> result;
@@ -171,27 +181,23 @@ public:
         result.push_back(std::nullopt);
       } else {
         const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
-        std::vector<utf8proc_uint8_t> dst;
-        dst.reserve(static_cast<size_t>(sv.size_bytes));
+        unsigned char *dst;
 
-        size_t bytes_read = 0;
-        size_t bytes_rem;
-        while ((bytes_rem = static_cast<size_t>(sv.size_bytes) - bytes_read) >
-               0) {
-          utf8proc_int32_t codepoint;
-          size_t codepoint_bytes = utf8proc_iterate(
-              reinterpret_cast<const utf8proc_uint8_t *>(sv.data + bytes_read),
-              bytes_rem, &codepoint);
-
-          utf8proc_int32_t codepoint_upper = utf8proc_toupper(codepoint);
-          bytes_read += codepoint_bytes;
-
-          std::array<utf8proc_uint8_t, 4> encoded;
-          utf8proc_encode_char(codepoint_upper, encoded.data());
-          dst.insert(dst.end(), encoded.begin(),
-                     encoded.begin() + codepoint_bytes);
+        const ssize_t nbytes = utf8proc_map_custom(
+            reinterpret_cast<const uint8_t *>(sv.data), sv.size_bytes, &dst,
+            UTF8PROC_STABLE, utf8proc_toupper_wrapper, NULL);
+        if (nbytes < 0) {
+          throw std::runtime_error("error occurred converting toupper!");
         }
-        result.push_back(std::string{dst.begin(), dst.end()});
+
+        // utf8proc and std::string but malloc on the heap; maybe we could avoid
+        // a second malloc with a StringArray constructor for raw C pointers
+        std::string converted{};
+        converted.resize(nbytes);
+        memcpy(&converted[0], dst, nbytes);
+        free(dst);
+
+        result.push_back(std::move(converted));
       }
     }
 
