@@ -68,6 +68,38 @@ public:
     }
   }
 
+  std::vector<std::optional<size_t>> len() {
+    std::vector<std::optional<size_t>> result;
+    const auto n = array_->length;
+
+    result.reserve(n);
+    for (int64_t i = 0; i < n; i++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), i)) {
+        result.push_back(std::nullopt);
+      } else {
+        const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
+
+        size_t niter = 0;
+        size_t bytes_read = 0;
+        size_t bytes_rem;
+        while ((bytes_rem = static_cast<size_t>(sv.size_bytes) - bytes_read) >
+               0) {
+          utf8proc_int32_t codepoint;
+          size_t codepoint_bytes = utf8proc_iterate(
+              reinterpret_cast<const utf8proc_uint8_t *>(sv.data + bytes_read),
+              bytes_rem, &codepoint);
+
+          niter++;
+          bytes_read += codepoint_bytes;
+        }
+
+        result.push_back(niter);
+      }
+    }
+
+    return result;
+  }
+
   StringArray lower() {
     std::vector<std::optional<std::string>> result;
     const auto n = array_->length;
@@ -360,6 +392,7 @@ private:
 NB_MODULE(nanopandas, m) {
   nb::class_<StringArray>(m, "StringArray")
       .def(nb::init<std::vector<std::optional<std::string_view>>>())
+      .def("len", &StringArray::len)
       .def("lower", &StringArray::lower)
       .def("upper", &StringArray::upper)
       .def("capitalize", &StringArray::capitalize)
