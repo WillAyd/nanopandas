@@ -67,83 +67,6 @@ public:
     }
   }
 
-  StringArray cat() { throw std::runtime_error("not implemented"); }
-  std::vector<std::vector<std::string>> split() {
-    throw std::runtime_error("not implemented");
-  }
-  std::vector<std::vector<std::string>> rsplit() {
-    throw std::runtime_error("not implemented");
-  }
-  std::vector<char> get(size_t position) {
-    throw std::runtime_error("not implemented");
-  }
-  std::vector<std::vector<std::string>> join() {
-    throw std::runtime_error("not implemented");
-  }
-  StringArray get_dummies() { throw std::runtime_error("not implemented"); }
-  std::vector<bool> contains() { throw std::runtime_error("not implemented"); }
-  StringArray replace() { throw std::runtime_error("not implemented"); }
-  StringArray removeprefix(const std::string &prefix) {
-    throw std::runtime_error("not implemented");
-  }
-  StringArray removesuffix(const std::string &suffix) {
-    throw std::runtime_error("not implemented");
-  }
-  StringArray repeat(size_t repeats) {
-    throw std::runtime_error("not implemented");
-  }
-  StringArray pad(size_t width, const std::string &side, char fillchar) {
-    throw std::runtime_error("not implemented");
-  }
-  StringArray center(size_t width, char fillchar) {
-    throw std::runtime_error("not implemented");
-  }
-  StringArray ljust(size_t width, char fillchar) {
-    throw std::runtime_error("not implemented");
-  }
-  StringArray rjust(size_t width, char fillchar) {
-    throw std::runtime_error("not implemented");
-  }
-  StringArray zfill(size_t width) {
-    throw std::runtime_error("not implemented");
-  }
-  StringArray wrap(size_t width) {
-    throw std::runtime_error("not implemented");
-  }
-  StringArray slice(ssize_t start, ssize_t stop, ssize_t step) {
-    throw std::runtime_error("not implemented");
-  }
-  StringArray slice_replace(ssize_t start, ssize_t stop, char repl) {
-    throw std::runtime_error("not implemented");
-  }
-  std::vector<size_t> count() { throw std::runtime_error("not implemented"); }
-  std::vector<bool> startswith() {
-    throw std::runtime_error("not implemented");
-  }
-  std::vector<bool> endswith() { throw std::runtime_error("not implemented"); }
-  std::vector<std::vector<std::string>> findall() {
-    throw std::runtime_error("not implemented");
-  }
-  std::vector<std::vector<std::string>> match() {
-    throw std::runtime_error("not implemented");
-  }
-  std::vector<std::vector<std::string>> extract() {
-    throw std::runtime_error("not implemented");
-  }
-  std::vector<std::vector<std::string>> extractall() {
-    throw std::runtime_error("not implemented");
-  }
-  std::vector<size_t> len() { throw std::runtime_error("not implemented"); }
-  StringArray strip() { throw std::runtime_error("not implemented"); }
-  StringArray rstrip() { throw std::runtime_error("not implemented"); }
-  StringArray lstrip() { throw std::runtime_error("not implemented"); }
-  std::vector<std::vector<std::string>> partition() {
-    throw std::runtime_error("not implemented");
-  }
-  std::vector<std::vector<std::string>> rpartition() {
-    throw std::runtime_error("not implemented");
-  }
-
   StringArray lower() {
     std::vector<std::optional<std::string>> result;
     const auto n = array_->length;
@@ -177,8 +100,6 @@ public:
     return StringArray{result};
   }
 
-  StringArray casefold() { throw std::runtime_error("not implemented"); }
-
   StringArray upper() {
     std::vector<std::optional<std::string>> result;
     const auto n = array_->length;
@@ -210,24 +131,6 @@ public:
     }
 
     return StringArray{result};
-  }
-
-  std::vector<ssize_t> find(const std::string &string, size_t start,
-                            size_t end) {
-    throw std::runtime_error("not implemented");
-  }
-  std::vector<ssize_t> rfind(const std::string &string, size_t start,
-                             size_t end) {
-    throw std::runtime_error("not implemented");
-  }
-
-  std::vector<size_t> index(const std::string &string, size_t start,
-                            size_t end) {
-    throw std::runtime_error("not implemented");
-  }
-  std::vector<size_t> rindex(const std::string &string, size_t start,
-                             size_t end) {
-    throw std::runtime_error("not implemented");
   }
 
   StringArray capitalize() {
@@ -269,10 +172,6 @@ public:
 
     return StringArray{result};
   }
-
-  StringArray swapcase() { throw std::runtime_error("not implemented"); }
-  StringArray normalize() { throw std::runtime_error("not implemented"); }
-  StringArray translate() { throw std::runtime_error("not implemented"); }
 
   std::vector<std::optional<bool>> isalnum() {
     std::vector<std::optional<bool>> result;
@@ -323,15 +222,6 @@ public:
 
     return result;
   }
-
-  std::vector<bool> isalpha() { throw std::runtime_error("not implemented"); }
-  std::vector<bool> isdigit() { throw std::runtime_error("not implemented"); }
-  std::vector<bool> isspace() { throw std::runtime_error("not implemented"); }
-  std::vector<bool> islower() { throw std::runtime_error("not implemented"); }
-  std::vector<bool> isupper() { throw std::runtime_error("not implemented"); }
-  std::vector<bool> istitle() { throw std::runtime_error("not implemented"); }
-  std::vector<bool> isnumeric() { throw std::runtime_error("not implemented"); }
-  std::vector<bool> isdecimal() { throw std::runtime_error("not implemented"); }
 
   // Misc extras
   int64_t size() { return array_->length; }
@@ -394,58 +284,10 @@ private:
 NB_MODULE(nanopandas, m) {
   nb::class_<StringArray>(m, "StringArray")
       .def(nb::init<std::vector<std::optional<std::string_view>>>())
-      .def("cat", &StringArray::cat)
-      .def("split", &StringArray::split)
-      .def("rsplit", &StringArray::rsplit)
-      .def("get", &StringArray::get)
-      .def("join", &StringArray::join)
-      .def("get_dummies", &StringArray::get_dummies)
-      .def("contains", &StringArray::contains)
-      .def("replace", &StringArray::replace)
-      .def("removeprefix", &StringArray::removeprefix)
-      .def("removesuffix", &StringArray::removesuffix)
-      .def("repeat", &StringArray::repeat)
-      .def("pad", &StringArray::pad)
-      .def("center", &StringArray::center)
-      .def("ljust", &StringArray::ljust)
-      .def("rjust", &StringArray::rjust)
-      .def("zfill", &StringArray::zfill)
-      .def("wrap", &StringArray::wrap)
-      .def("slice", &StringArray::slice)
-      .def("slice_replace", &StringArray::slice_replace)
-      .def("count", &StringArray::count)
-      .def("startswith", &StringArray::startswith)
-      .def("endswith", &StringArray::endswith)
-      .def("findall", &StringArray::findall)
-      .def("match", &StringArray::match)
-      .def("extract", &StringArray::extract)
-      .def("extractall", &StringArray::extractall)
-      .def("len", &StringArray::len)
-      .def("strip", &StringArray::strip)
-      .def("rstrip", &StringArray::rstrip)
-      .def("lstrip", &StringArray::lstrip)
-      .def("partition", &StringArray::partition)
-      .def("rpartition", &StringArray::rpartition)
       .def("lower", &StringArray::lower)
-      .def("casefold", &StringArray::casefold)
       .def("upper", &StringArray::upper)
-      .def("find", &StringArray::find)
-      .def("rfind", &StringArray::rfind)
-      .def("index", &StringArray::rindex)
       .def("capitalize", &StringArray::capitalize)
-      .def("swapcase", &StringArray::swapcase)
-      .def("normalize", &StringArray::normalize)
-      .def("translate", &StringArray::translate)
       .def("isalnum", &StringArray::isalnum)
-      .def("isalpha", &StringArray::isalpha)
-      .def("isdigit", &StringArray::isdigit)
-      .def("isspace", &StringArray::isspace)
-      .def("islower", &StringArray::islower)
-      .def("isupper", &StringArray::isupper)
-      .def("istitle", &StringArray::istitle)
-      .def("isnumeric", &StringArray::isnumeric)
-      .def("isdecimal", &StringArray::isdecimal)
-
       // some extras that may be useful
       .def_prop_ro("size", &StringArray::size)
       .def_prop_ro("nbytes", &StringArray::nbytes)
