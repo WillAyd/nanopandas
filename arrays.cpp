@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <functional>
+#include <limits>
 #include <set>
 
 #include <nanoarrow/nanoarrow_types.h>
@@ -18,9 +19,135 @@ static_assert(std::is_same_v<std::uint8_t, char> ||
 
 namespace nb = nanobind;
 
+class Int64Array {
+public:
+  template <typename C> explicit Int64Array(const C &integers) {
+    // TODO: assert we only get integral or std::optional<integral>
+    // static_assert(std::is_integral<typename C::value_type>::value ||
+    //              std::is_same<typename C::value_type,
+    //                           std::optional<std::string_view>>::value);
+
+    if (ArrowArrayInitFromType(array_.get(), NANOARROW_TYPE_INT64)) {
+      throw std::runtime_error("Unable to init Int64Array!");
+    };
+
+    if (ArrowArrayStartAppending(array_.get())) {
+      throw std::runtime_error("Could not append to Int64Array!");
+    }
+
+    for (const auto &opt_integer : integers) {
+      if (const auto &integer = opt_integer) {
+        if (ArrowArrayAppendInt(array_.get(), *integer)) {
+          throw std::invalid_argument("Could not append integer: " +
+                                      std::to_string(*integer));
+        }
+      } else {
+        if (ArrowArrayAppendNull(array_.get(), 1)) {
+          throw std::invalid_argument("Failed to append null!");
+        }
+      }
+    }
+
+    if (ArrowArrayFinishBuildingDefault(array_.get(), nullptr)) {
+      throw std::runtime_error("Failed to finish building array!");
+    }
+
+    ArrowArrayViewInitFromType(array_view_.get(), NANOARROW_TYPE_INT64);
+    if (ArrowArrayViewSetArray(array_view_.get(), array_.get(), nullptr)) {
+      throw std::runtime_error("Failed to set array view!");
+    }
+  }
+
+  Int64Array(nanoarrow::UniqueArray &&array) : array_(std::move(array)) {
+    ArrowArrayViewInitFromType(array_view_.get(), NANOARROW_TYPE_INT64);
+    struct ArrowError error;
+    if (ArrowArrayViewSetArray(array_view_.get(), array_.get(), &error)) {
+      throw std::runtime_error("Failed to set array view:" +
+                               std::string(error.message));
+    }
+  }
+
+  // not copyable
+  Int64Array(const Int64Array &rhs) = delete;
+
+  // moving should take ownership of the underlying array
+  // TODO: do we need to move array_view?
+  Int64Array(Int64Array &&rhs) : Int64Array(std::move(rhs.array_)) {}
+
+  Int64Array &operator=(Int64Array &&rhs) {
+    this->array_ = std::move(rhs.array_);
+    this->array_view_ = std::move(rhs.array_view_);
+    return *this;
+  }
+
+  std::optional<int64_t> sum() {
+    const auto n = array_->length;
+    if (array_->length == 0) {
+      return std::nullopt;
+    }
+
+    int64_t result = 0;
+    for (int64_t i = 0; i < n; i++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), i)) {
+        continue;
+      } else {
+        result += ArrowArrayViewGetIntUnsafe(array_view_.get(), i);
+      }
+    }
+
+    return result;
+  }
+
+  std::optional<int64_t> min() {
+    const auto n = array_->length;
+    if (array_->length == 0) {
+      return std::nullopt;
+    }
+
+    int64_t result = std::numeric_limits<int64_t>::max();
+    for (int64_t i = 0; i < n; i++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), i)) {
+        continue;
+      } else {
+        const int64_t value = ArrowArrayViewGetIntUnsafe(array_view_.get(), i);
+        if (value < result) {
+          result = value;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  std::optional<int64_t> max() {
+    const auto n = array_->length;
+    if (array_->length == 0) {
+      return std::nullopt;
+    }
+
+    int64_t result = std::numeric_limits<int64_t>::min();
+    for (int64_t i = 0; i < n; i++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), i)) {
+        continue;
+      } else {
+        const int64_t value = ArrowArrayViewGetIntUnsafe(array_view_.get(), i);
+        if (value > result) {
+          result = value;
+        }
+      }
+    }
+
+    return result;
+  }
+
+private:
+  nanoarrow::UniqueArray array_;
+  nanoarrow::UniqueArrayView array_view_;
+};
+
 class StringArray {
 public:
-  template <typename C> StringArray(const C &strings) {
+  template <typename C> explicit StringArray(const C &strings) {
     static_assert(std::is_same<typename C::value_type,
                                std::optional<std::string>>::value ||
                   std::is_same<typename C::value_type,
@@ -58,14 +185,26 @@ public:
     }
   }
 
-  std::vector<std::optional<size_t>> len() {
-    std::vector<std::optional<size_t>> result;
+  Int64Array len() {
+    nanoarrow::UniqueArray result;
+    if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_INT64)) {
+      throw std::runtime_error("Unable to init int64 array!");
+    }
     const auto n = array_->length;
 
-    result.reserve(n);
+    if (ArrowArrayStartAppending(result.get())) {
+      throw std::runtime_error("Could not start appending");
+    }
+
+    if (ArrowArrayReserve(result.get(), n)) {
+      throw std::runtime_error("Unable to reserve array!");
+    }
+
     for (int64_t i = 0; i < n; i++) {
       if (ArrowArrayViewIsNull(array_view_.get(), i)) {
-        result.push_back(std::nullopt);
+        if (ArrowArrayAppendNull(result.get(), i)) {
+          throw std::runtime_error("failed to append null!");
+        }
       } else {
         const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
 
@@ -83,11 +222,19 @@ public:
           bytes_read += codepoint_bytes;
         }
 
-        result.push_back(niter);
+        if (ArrowArrayAppendInt(result.get(), niter)) {
+          throw std::runtime_error("failed to append int!");
+        }
       }
     }
 
-    return result;
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    return Int64Array(std::move(result));
   }
 
   StringArray lower() {
@@ -390,6 +537,12 @@ private:
 // try to match all pandas methods
 // https://pandas.pydata.org/pandas-docs/stable/user_guide/text.html#method-summary
 NB_MODULE(nanopandas, m) {
+  nb::class_<Int64Array>(m, "Int64Array")
+      .def(nb::init<std::vector<std::optional<int64_t>>>())
+      .def("sum", &Int64Array::sum)
+      .def("min", &Int64Array::min)
+      .def("max", &Int64Array::max);
+
   nb::class_<StringArray>(m, "StringArray")
       .def(nb::init<std::vector<std::optional<std::string_view>>>())
       .def("len", &StringArray::len)
