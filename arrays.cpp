@@ -18,16 +18,6 @@ static_assert(std::is_same_v<std::uint8_t, char> ||
 
 namespace nb = nanobind;
 
-static utf8proc_int32_t utf8proc_toupper_wrapper(utf8proc_int32_t codepoint,
-                                                 void *data) {
-  return utf8proc_toupper(codepoint);
-}
-
-static utf8proc_int32_t utf8proc_tolower_wrapper(utf8proc_int32_t codepoint,
-                                                 void *data) {
-  return utf8proc_tolower(codepoint);
-}
-
 class StringArray {
 public:
   template <typename C> StringArray(const C &strings) {
@@ -112,9 +102,14 @@ public:
         const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
         unsigned char *dst;
 
+        constexpr auto lambda = [](utf8proc_int32_t codepoint,
+                                   void *unused) -> utf8proc_int32_t {
+          return utf8proc_tolower(codepoint);
+        };
+
         const ssize_t nbytes = utf8proc_map_custom(
             reinterpret_cast<const uint8_t *>(sv.data), sv.size_bytes, &dst,
-            UTF8PROC_STABLE, utf8proc_tolower_wrapper, NULL);
+            UTF8PROC_STABLE, lambda, NULL);
         if (nbytes < 0) {
           throw std::runtime_error("error occurred converting tolower!");
         }
@@ -145,9 +140,14 @@ public:
         const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
         unsigned char *dst;
 
+        constexpr auto lambda = [](utf8proc_int32_t codepoint,
+                                   void *unused) -> utf8proc_int32_t {
+          return utf8proc_toupper(codepoint);
+        };
+
         const ssize_t nbytes = utf8proc_map_custom(
             reinterpret_cast<const uint8_t *>(sv.data), sv.size_bytes, &dst,
-            UTF8PROC_STABLE, utf8proc_toupper_wrapper, NULL);
+            UTF8PROC_STABLE, lambda, NULL);
         if (nbytes < 0) {
           throw std::runtime_error("error occurred converting toupper!");
         }
