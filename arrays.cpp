@@ -19,6 +19,92 @@ static_assert(std::is_same_v<std::uint8_t, char> ||
 
 namespace nb = nanobind;
 
+class BoolArray {
+public:
+  template <typename C> explicit BoolArray(const C &booleans) {
+    // TODO: assert we only get bool or std::optional<bool>
+    // static_assert(std::is_integral<typename C::value_type>::value ||
+    //              std::is_same<typename C::value_type,
+    //                           std::optional<bool>>::value);
+
+    if (ArrowArrayInitFromType(array_.get(), NANOARROW_TYPE_BOOL)) {
+      throw std::runtime_error("Unable to init BoolArray!");
+    };
+
+    if (ArrowArrayStartAppending(array_.get())) {
+      throw std::runtime_error("Could not append to BoolArray!");
+    }
+
+    for (const auto &opt_boolean : booleans) {
+      if (const auto &boolean = opt_boolean) {
+        if (ArrowArrayAppendInt(array_.get(), *boolean)) {
+          throw std::invalid_argument("Could not append integer: " +
+                                      std::to_string(*boolean));
+        }
+      } else {
+        if (ArrowArrayAppendNull(array_.get(), 1)) {
+          throw std::invalid_argument("Failed to append null!");
+        }
+      }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(array_.get(), &error)) {
+      throw std::runtime_error("Failed to finish building array!" +
+                               std::string(error.message));
+    }
+
+    ArrowArrayViewInitFromType(array_view_.get(), NANOARROW_TYPE_INT64);
+    if (ArrowArrayViewSetArray(array_view_.get(), array_.get(), &error)) {
+      throw std::runtime_error("Failed to set array view!" +
+                               std::string(error.message));
+    }
+  }
+
+  BoolArray(nanoarrow::UniqueArray &&array) : array_(std::move(array)) {
+    ArrowArrayViewInitFromType(array_view_.get(), NANOARROW_TYPE_BOOL);
+    struct ArrowError error;
+    if (ArrowArrayViewSetArray(array_view_.get(), array_.get(), &error)) {
+      throw std::runtime_error("Failed to set array view:" +
+                               std::string(error.message));
+    }
+  }
+
+  // not copyable
+  BoolArray(const BoolArray &rhs) = delete;
+
+  // moving should take ownership of the underlying array
+  // TODO: do we need to move array_view?
+  BoolArray(BoolArray &&rhs) : BoolArray(std::move(rhs.array_)) {}
+
+  BoolArray &operator=(BoolArray &&rhs) {
+    this->array_ = std::move(rhs.array_);
+    this->array_view_ = std::move(rhs.array_view_);
+    return *this;
+  }
+
+  std::vector<std::optional<bool>> to_pylist() {
+    const auto n = array_->length;
+
+    std::vector<std::optional<bool>> result;
+    result.reserve(n);
+    for (int64_t i = 0; i < n; i++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), i)) {
+        result.push_back(std::nullopt);
+      } else {
+        const auto value = ArrowArrayViewGetIntUnsafe(array_view_.get(), i);
+        result.push_back(value);
+      }
+    }
+
+    return result;
+  }
+
+private:
+  nanoarrow::UniqueArray array_;
+  nanoarrow::UniqueArrayView array_view_;
+};
+
 class Int64Array {
 public:
   template <typename C> explicit Int64Array(const C &integers) {
@@ -134,6 +220,23 @@ public:
         if (value > result) {
           result = value;
         }
+      }
+    }
+
+    return result;
+  }
+
+  std::vector<std::optional<bool>> to_pylist() {
+    const auto n = array_->length;
+
+    std::vector<std::optional<bool>> result;
+    result.reserve(n);
+    for (int64_t i = 0; i < n; i++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), i)) {
+        result.push_back(std::nullopt);
+      } else {
+        const auto value = ArrowArrayViewGetIntUnsafe(array_view_.get(), i);
+        result.push_back(value);
       }
     }
 
@@ -353,7 +456,7 @@ public:
     return StringArray{result};
   }
 
-  std::vector<std::optional<bool>> isalnum() {
+  BoolArray isalnum() {
     constexpr auto lambda = [](utf8proc_int32_t codepoint) {
       const auto category = utf8proc_category(codepoint);
       switch (category) {
@@ -374,7 +477,7 @@ public:
     return IsFuncApplicator(lambda);
   }
 
-  std::vector<std::optional<bool>> isalpha() {
+  BoolArray isalpha() {
     constexpr auto lambda = [](utf8proc_int32_t codepoint) {
       const auto category = utf8proc_category(codepoint);
       switch (category) {
@@ -392,7 +495,7 @@ public:
     return IsFuncApplicator(lambda);
   }
 
-  std::vector<std::optional<bool>> isdigit() {
+  BoolArray isdigit() {
     constexpr auto lambda = [](utf8proc_int32_t codepoint) {
       const auto category = utf8proc_category(codepoint);
       switch (category) {
@@ -408,7 +511,7 @@ public:
     return IsFuncApplicator(lambda);
   }
 
-  std::vector<std::optional<bool>> isspace() {
+  BoolArray isspace() {
     constexpr auto lambda = [](utf8proc_int32_t codepoint) {
       const auto category = utf8proc_category(codepoint);
       switch (category) {
@@ -424,7 +527,7 @@ public:
     return IsFuncApplicator(lambda);
   }
 
-  std::vector<std::optional<bool>> islower() {
+  BoolArray islower() {
     constexpr auto lambda = [](utf8proc_int32_t codepoint) {
       return utf8proc_islower(codepoint);
     };
@@ -432,7 +535,7 @@ public:
     return IsFuncApplicator(lambda);
   }
 
-  std::vector<std::optional<bool>> isupper() {
+  BoolArray isupper() {
     constexpr auto lambda = [](utf8proc_int32_t codepoint) {
       return utf8proc_isupper(codepoint);
     };
@@ -492,15 +595,27 @@ public:
   }
 
 private:
-  std::vector<std::optional<bool>>
+  BoolArray
   IsFuncApplicator(const std::function<bool(utf8proc_int32_t)> &lambda) {
-    std::vector<std::optional<bool>> result;
+    nanoarrow::UniqueArray result;
+    if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_BOOL)) {
+      throw std::runtime_error("Unable to init bool array!");
+    }
     const auto n = array_->length;
 
-    result.reserve(n);
+    if (ArrowArrayStartAppending(result.get())) {
+      throw std::runtime_error("Could not start appending");
+    }
+
+    if (ArrowArrayReserve(result.get(), n)) {
+      throw std::runtime_error("Unable to reserve array!");
+    }
+
     for (int64_t i = 0; i < n; i++) {
       if (ArrowArrayViewIsNull(array_view_.get(), i)) {
-        result.push_back(std::nullopt);
+        if (ArrowArrayAppendNull(result.get(), i)) {
+          throw std::runtime_error("failed to append null!");
+        }
       } else {
         const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
 
@@ -523,8 +638,16 @@ private:
           bytes_read += codepoint_bytes;
         }
 
-        result.push_back(is_true);
+        if (ArrowArrayAppendInt(result.get(), is_true)) {
+          throw std::runtime_error("failed to append bool!");
+        }
       }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
     }
 
     return result;
@@ -537,11 +660,16 @@ private:
 // try to match all pandas methods
 // https://pandas.pydata.org/pandas-docs/stable/user_guide/text.html#method-summary
 NB_MODULE(nanopandas, m) {
+  nb::class_<BoolArray>(m, "BoolArray")
+      .def(nb::init<std::vector<std::optional<int64_t>>>())
+      .def("to_pylist", &BoolArray::to_pylist);
+
   nb::class_<Int64Array>(m, "Int64Array")
       .def(nb::init<std::vector<std::optional<int64_t>>>())
       .def("sum", &Int64Array::sum)
       .def("min", &Int64Array::min)
-      .def("max", &Int64Array::max);
+      .def("max", &Int64Array::max)
+      .def("to_pylist", &Int64Array::to_pylist);
 
   nb::class_<StringArray>(m, "StringArray")
       .def(nb::init<std::vector<std::optional<std::string_view>>>())
