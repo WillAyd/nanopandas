@@ -28,7 +28,7 @@ def test_getitem():
     assert arr[2] == "bar"
     assert arr[3] == "baz"
 
-    
+
 def test_len():
     arr = nanopd.StringArray(["foo", "bar", "baz"])
     assert len(arr) == 3
@@ -50,13 +50,13 @@ def test_nbytes():
     arr = nanopd.StringArray(["foo", "bar", "baz"])
     assert arr.nbytes == 32
 
-    
+
 def test_isna():
     arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
     result = arr.isna()
     assert result.to_pylist() == [False, True, False, True, False]
 
-    
+
 def test_take():
     arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
     result = arr.take([0, 1, 1, 0])
@@ -85,6 +85,25 @@ def test_interpolate():
     assert result.to_pylist() == expected
 
 
+def test_repr():
+    arr = nanopd.StringArray([None, "foo", "bar", "baz"])
+    result = repr(arr)
+    expected = """StringArray
+[null, "foo", "bar", "baz"]"""
+
+    assert result == expected
+
+
+def test_repr_truncation():
+    arr = nanopd.StringArray(["a" * 40])
+    second_line = f'["{"a" * 38}'
+    result = repr(arr)
+    expected = f"""StringArray
+{second_line}"""
+
+    assert result == expected
+
+
 def test_fillna():
     arr = nanopd.StringArray([None, "foo", None, "bar", None, "baz"])
     result = arr.fillna("filled")
@@ -92,13 +111,27 @@ def test_fillna():
     assert result.to_pylist() == expected
 
 
+def test_pad_or_backfill_pad():
+    arr = nanopd.StringArray([None, "foo", None, None, "baz", None])
+    result = arr._pad_or_backfill("pad")
+    expected = [None, "foo", "foo", "foo", "baz", "baz"]
+    assert result.to_pylist() == expected
+
+
+def test_pad_or_backfill_backfill():
+    arr = nanopd.StringArray([None, "foo", None, None, "baz", None])
+    result = arr._pad_or_backfill("backfill")
+    expected = ["foo", "foo", "baz", "baz", "baz", None]
+    assert result.to_pylist() == expected
+
+
 def test_dropna():
     arr = nanopd.StringArray([None, "foo", None, "bar", None, "baz"])
     result = arr.dropna()
     expected = ["foo", "bar", "baz"]
-    assert result.to_pylist() == expected            
+    assert result.to_pylist() == expected
 
-    
+
 def test_unique():
     arr = nanopd.StringArray(["foo", None, "foo", "üàéµ", "üàéµ"])
     result = arr.unique()
@@ -122,7 +155,7 @@ def test_len():
     arr = nanopd.StringArray(["foo", None, "bar", "üàéµ", "baz"])
     result = arr.len()
     assert result.to_pylist() == [3, None, 3, 4, 3]
-    
+
 
 def test_lower():
     arr = nanopd.StringArray(["FOO", None, "BAR", "ÜÀÉΜ", "baz"])
@@ -171,7 +204,7 @@ def test_islower():
     result = arr.islower()
     assert result.to_pylist() == [False, None, True, False, True]
 
-    
+
 def test_isupper():
     arr = nanopd.StringArray(["FOO", None, "foo", "ÜÀÉΜ", "üàéµ"])
     result = arr.isupper()

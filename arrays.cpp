@@ -10,6 +10,7 @@
 #include <nanobind/stl/string_view.h>
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/vector.h>
+#include <sstream>
 #include <utf8proc.h>
 
 #include <nanoarrow/nanoarrow.hpp>
@@ -685,6 +686,65 @@ public:
     return StringArray(std::move(result));
   }
 
+  std::string __repr__() {
+    std::ostringstream out{};
+    out << "StringArray\n[";
+    constexpr size_t maxchars = 40;
+    size_t chars_written = 1;
+    const auto n = array_->length;
+    for (int64_t idx = 0; idx < n; idx++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), idx)) {
+        out << "null";
+        chars_written += 4;
+        if (chars_written >= maxchars) {
+          break;
+        }
+      } else {
+        out << "\"";
+        chars_written += 1;
+        if (chars_written >= maxchars) {
+          break;
+        }
+        const auto arrow_sv =
+            ArrowArrayViewGetStringUnsafe(array_view_.get(), idx);
+
+        const auto nbytes = static_cast<size_t>(arrow_sv.size_bytes);
+        const size_t bytes_to_write = (maxchars - chars_written) > nbytes
+                                          ? nbytes
+                                          : maxchars - chars_written;
+
+        const std::string_view sv{arrow_sv.data, bytes_to_write};
+        out << sv;
+        chars_written += bytes_to_write;
+        if (chars_written >= maxchars) {
+          break;
+        }
+
+        out << "\"";
+        chars_written += 1;
+        if (chars_written >= maxchars) {
+          break;
+        }
+      }
+      if (idx < n - 1) {
+        out << ", ";
+        chars_written += 1;
+        if (chars_written >= maxchars) {
+          break;
+        }
+
+      } else {
+        out << "]";
+        chars_written += 1;
+        if (chars_written >= maxchars) {
+          break;
+        }
+      }
+    }
+
+    return out.str();
+  }
+
   StringArray fillna(std::string_view replacement) {
     nanoarrow::UniqueArray result;
     if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_LARGE_STRING)) {
@@ -712,6 +772,85 @@ public:
         const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), idx);
         if (ArrowArrayAppendString(result.get(), sv)) {
           throw std::runtime_error("failed to append string!");
+        }
+      }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    return StringArray(std::move(result));
+  }
+
+  StringArray _pad_or_backfill(std::string_view method) {
+    if ((method != "pad") && (method != "backfill")) {
+      throw std::invalid_argument(
+          "'method' must be either 'pad' or 'backfill'");
+    }
+
+    nanoarrow::UniqueArray result;
+    if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_LARGE_STRING)) {
+      throw std::runtime_error("Unable to init large string array!");
+    }
+
+    const auto n = array_->length;
+
+    if (ArrowArrayStartAppending(result.get())) {
+      throw std::runtime_error("Could not start appending");
+    }
+
+    if (ArrowArrayReserve(result.get(), n)) {
+      throw std::runtime_error("Unable to reserve array!");
+    }
+
+    if (method == "pad") {
+      bool seen_value = false;
+      struct ArrowStringView most_recent_sv;
+      for (int64_t idx = 0; idx < array_.get()->length; idx++) {
+        if (ArrowArrayViewIsNull(array_view_.get(), idx)) {
+          if (!seen_value) {
+            if (ArrowArrayAppendNull(result.get(), 1)) {
+              throw std::runtime_error("failed to append null!");
+            }
+          } else {
+            if (ArrowArrayAppendString(result.get(), most_recent_sv)) {
+              throw std::runtime_error("failed to append string!");
+            }
+          }
+        } else {
+          seen_value = true;
+          const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), idx);
+          if (ArrowArrayAppendString(result.get(), sv)) {
+            throw std::runtime_error("failed to append string!");
+          }
+          most_recent_sv = sv;
+        }
+      }
+    } else {
+      struct ArrowStringView next_sv;
+      int64_t last_append = 0;
+      for (int64_t idx = 0; idx < array_.get()->length; idx++) {
+        if (ArrowArrayViewIsNull(array_view_.get(), idx)) {
+          if (idx == array_.get()->length - 1) {
+            do {
+              if (ArrowArrayAppendNull(result.get(), 1)) {
+                throw std::runtime_error("failed to append null!");
+              }
+              last_append++;
+            } while (last_append <= idx);
+          }
+          continue;
+        } else {
+          const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), idx);
+          do {
+            if (ArrowArrayAppendString(result.get(), sv)) {
+              throw std::runtime_error("failed to append string!");
+            }
+            last_append++;
+          } while (last_append <= idx);
         }
       }
     }
@@ -1236,8 +1375,12 @@ NB_MODULE(nanopandas, m) {
       .def("_concat_same_type", &StringArray::_concat_same_type)
       .def("interpolate", &StringArray::interpolate)
 
+      // formatting methods
+      .def("__repr__", &StringArray::__repr__)
+
       // extra interface methods
       .def("fillna", &StringArray::fillna)
+      .def("_pad_or_backfill", &StringArray::_pad_or_backfill)
       .def("dropna", &StringArray::dropna)
       .def("unique", &StringArray::unique)
       .def("factorize", &StringArray::factorize)
