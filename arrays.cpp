@@ -466,8 +466,9 @@ public:
     return data_buffer->size_bytes;
   }
 
-  // TODO: do we need to support negative indices?
   BoolArray isna() {
+    // This implementation is extremely inefficient; instead of a loop we should
+    // just memcpy the bitmask from array_view_ into the target result data buffer
     nanoarrow::UniqueArray result;
     if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_BOOL)) {
       throw std::runtime_error("Unable to init bool array!");
