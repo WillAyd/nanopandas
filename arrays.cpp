@@ -304,6 +304,41 @@ public:
   // TODO: do we need to move array_view?
   StringArray(StringArray &&rhs) : StringArray(std::move(rhs.array_)) {}
 
+  StringArray _from_sequence(nb::sequence sequence) {
+    nanoarrow::UniqueArray result;
+    if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_LARGE_STRING)) {
+      throw std::runtime_error("Unable to init large string array!");
+    }
+    const auto n = array_->length;
+
+    if (ArrowArrayStartAppending(result.get())) {
+      throw std::runtime_error("Could not start appending");
+    }
+
+    for (const auto &item : sequence) {
+      if (item.is_none()) {
+        if (ArrowArrayAppendNull(result.get(), 1)) {
+          throw std::runtime_error("failed to append null!");
+        }
+      } else {
+        std::string_view sv = nb::cast<std::string_view>(item);
+        const struct ArrowStringView arrow_sv = {
+            sv.data(), static_cast<int64_t>(sv.size())};
+        if (ArrowArrayAppendString(result.get(), arrow_sv)) {
+          throw std::runtime_error("failed to append string!");
+        }
+      }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    return StringArray(std::move(result));
+  }
+
   std::optional<std::string> __getitem__(int64_t i) {
     if (i < 0) {
       throw std::range_error("Only positive indexes are supported for now!");
@@ -1134,6 +1169,7 @@ NB_MODULE(nanopandas, m) {
       .def(nb::init<std::vector<std::optional<std::string_view>>>())
 
       // extension array interface
+      .def("_from_sequence", &StringArray::_from_sequence)
       .def("__getitem__", &StringArray::__getitem__)
       .def("__len__", &StringArray::__len__)
       .def("__eq__", &StringArray::__eq__)

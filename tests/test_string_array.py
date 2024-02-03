@@ -1,11 +1,22 @@
 import nanopandas as nanopd
 
 
-def test_getitem():
-    arr = nanopd.StringArray(["foo", "bar", "baz"])
+def test_from_sequence():
+    # TODO: this is not really a classmethod
+    # See https://github.com/wjakob/nanobind/discussions/416
+    arr = nanopd.StringArray([])._from_sequence(("foo", None, "bar", "baz"))
     assert arr[0] == "foo"
-    assert arr[1] == "bar"
-    assert arr[2] == "baz"
+    assert arr[1] is None
+    assert arr[2] == "bar"
+    assert arr[3] == "baz"
+
+
+def test_getitem():
+    arr = nanopd.StringArray(["foo", None, "bar", "baz"])
+    assert arr[0] == "foo"
+    assert arr[1] is None
+    assert arr[2] == "bar"
+    assert arr[3] == "baz"
 
     
 def test_len():
