@@ -24,6 +24,7 @@ def test_dtype():
     arr = nanopd.StringArray(["foo", "bar", "baz"])
     assert arr.dtype == "string[arrow]"
 
+
 def test_nbytes():
     arr = nanopd.StringArray(["foo", "bar", "baz"])
     assert arr.nbytes == 32
@@ -41,6 +42,42 @@ def test_take():
     assert result.to_pylist() == ["foo", None, None, "foo"]
 
 
+def test_copy():
+    arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
+    result = arr.copy()
+    assert arr.to_pylist() == result.to_pylist()
+
+
+def test_concat_same_type():
+    arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
+    other = nanopd.StringArray([None, "quz", None, "quux"])
+    result = arr._concat_same_type(other)
+
+    expected = ["foo", None, "bar", None, "baz", None, "quz", None, "quux"]
+    assert result.to_pylist() == expected
+
+
+def test_interpolate():
+    arr = nanopd.StringArray([None, "foo", None, "bar", None, "baz"])
+    result = arr.interpolate()
+    expected = [None, "foo", "foo", "bar", "bar", "baz"]
+    assert result.to_pylist() == expected
+
+
+def test_fillna():
+    arr = nanopd.StringArray([None, "foo", None, "bar", None, "baz"])
+    result = arr.fillna("filled")
+    expected = ["filled", "foo", "filled", "bar", "filled", "baz"]
+    assert result.to_pylist() == expected
+
+
+def test_dropna():
+    arr = nanopd.StringArray([None, "foo", None, "bar", None, "baz"])
+    result = arr.dropna()
+    expected = ["foo", "bar", "baz"]
+    assert result.to_pylist() == expected            
+
+    
 def test_unique():
     arr = nanopd.StringArray(["foo", None, "foo", "üàéµ", "üàéµ"])
     result = arr.unique()

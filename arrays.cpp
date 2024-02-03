@@ -458,6 +458,221 @@ public:
     return StringArray(std::move(result));
   }
 
+  StringArray copy() {
+    nanoarrow::UniqueArray result;
+    if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_LARGE_STRING)) {
+      throw std::runtime_error("Unable to init large string array!");
+    }
+    const auto n = array_->length;
+
+    if (ArrowArrayStartAppending(result.get())) {
+      throw std::runtime_error("Could not start appending");
+    }
+
+    if (ArrowArrayReserve(result.get(), n)) {
+      throw std::runtime_error("Unable to reserve array!");
+    }
+
+    for (int64_t idx = 0; idx < n; idx++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), idx)) {
+        if (ArrowArrayAppendNull(result.get(), 1)) {
+          throw std::runtime_error("failed to append null!");
+        }
+      } else {
+        const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), idx);
+        if (ArrowArrayAppendString(result.get(), sv)) {
+          throw std::runtime_error("failed to append string!");
+        }
+      }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    return StringArray(std::move(result));
+  }
+
+  StringArray _concat_same_type(const StringArray &other) {
+    nanoarrow::UniqueArray result;
+    if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_LARGE_STRING)) {
+      throw std::runtime_error("Unable to init large string array!");
+    }
+
+    // TODO: check for overflow
+    const auto n = array_->length + other.array_->length;
+
+    if (ArrowArrayStartAppending(result.get())) {
+      throw std::runtime_error("Could not start appending");
+    }
+
+    if (ArrowArrayReserve(result.get(), n)) {
+      throw std::runtime_error("Unable to reserve array!");
+    }
+
+    for (int64_t idx = 0; idx < array_.get()->length; idx++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), idx)) {
+        if (ArrowArrayAppendNull(result.get(), 1)) {
+          throw std::runtime_error("failed to append null!");
+        }
+      } else {
+        const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), idx);
+        if (ArrowArrayAppendString(result.get(), sv)) {
+          throw std::runtime_error("failed to append string!");
+        }
+      }
+    }
+
+    for (int64_t idx = 0; idx < other.array_->length; idx++) {
+      if (ArrowArrayViewIsNull(other.array_view_.get(), idx)) {
+        if (ArrowArrayAppendNull(result.get(), 1)) {
+          throw std::runtime_error("failed to append null!");
+        }
+      } else {
+        const auto sv =
+            ArrowArrayViewGetStringUnsafe(other.array_view_.get(), idx);
+        if (ArrowArrayAppendString(result.get(), sv)) {
+          throw std::runtime_error("failed to append string!");
+        }
+      }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    return StringArray(std::move(result));
+  }
+
+  StringArray interpolate() {
+    nanoarrow::UniqueArray result;
+    if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_LARGE_STRING)) {
+      throw std::runtime_error("Unable to init large string array!");
+    }
+
+    // TODO: check for overflow
+    const auto n = array_->length;
+
+    if (ArrowArrayStartAppending(result.get())) {
+      throw std::runtime_error("Could not start appending");
+    }
+
+    if (ArrowArrayReserve(result.get(), n)) {
+      throw std::runtime_error("Unable to reserve array!");
+    }
+
+    bool seen_value = false;
+    struct ArrowStringView most_recent_sv;
+
+    for (int64_t idx = 0; idx < array_.get()->length; idx++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), idx)) {
+        if (!seen_value) {
+          if (ArrowArrayAppendNull(result.get(), 1)) {
+            throw std::runtime_error("failed to append null!");
+          }
+        } else {
+          if (ArrowArrayAppendString(result.get(), most_recent_sv)) {
+            throw std::runtime_error("failed to append string!");
+          }
+        }
+      } else {
+        seen_value = true;
+        const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), idx);
+        if (ArrowArrayAppendString(result.get(), sv)) {
+          throw std::runtime_error("failed to append string!");
+        }
+        most_recent_sv = sv;
+      }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    return StringArray(std::move(result));
+  }
+
+  StringArray fillna(std::string_view replacement) {
+    nanoarrow::UniqueArray result;
+    if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_LARGE_STRING)) {
+      throw std::runtime_error("Unable to init large string array!");
+    }
+
+    const auto n = array_->length;
+
+    if (ArrowArrayStartAppending(result.get())) {
+      throw std::runtime_error("Could not start appending");
+    }
+
+    if (ArrowArrayReserve(result.get(), n)) {
+      throw std::runtime_error("Unable to reserve array!");
+    }
+
+    const struct ArrowStringView replacement_sv = {
+        replacement.data(), static_cast<int64_t>(replacement.size())};
+    for (int64_t idx = 0; idx < array_.get()->length; idx++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), idx)) {
+        if (ArrowArrayAppendString(result.get(), replacement_sv)) {
+          throw std::runtime_error("failed to append string!");
+        }
+      } else {
+        const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), idx);
+        if (ArrowArrayAppendString(result.get(), sv)) {
+          throw std::runtime_error("failed to append string!");
+        }
+      }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    return StringArray(std::move(result));
+  }
+
+  StringArray dropna() {
+    nanoarrow::UniqueArray result;
+    if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_LARGE_STRING)) {
+      throw std::runtime_error("Unable to init large string array!");
+    }
+
+    const auto n = array_->length - array_view_->null_count;
+    if (ArrowArrayStartAppending(result.get())) {
+      throw std::runtime_error("Could not start appending");
+    }
+
+    if (ArrowArrayReserve(result.get(), n)) {
+      throw std::runtime_error("Unable to reserve array!");
+    }
+
+    for (int64_t idx = 0; idx < array_.get()->length; idx++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), idx)) {
+        continue;
+      } else {
+        const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), idx);
+        if (ArrowArrayAppendString(result.get(), sv)) {
+          throw std::runtime_error("failed to append string!");
+        }
+      }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    return StringArray(std::move(result));
+  }
+
   Int64Array len() {
     nanoarrow::UniqueArray result;
     if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_INT64)) {
@@ -837,14 +1052,22 @@ NB_MODULE(nanopandas, m) {
   nb::class_<StringArray>(m, "StringArray")
       .def(nb::init<std::vector<std::optional<std::string_view>>>())
 
-      // extension array methods
+      // extension array interface
       .def("__getitem__", &StringArray::__getitem__)
       .def("__len__", &StringArray::__len__)
-      .def("__eq__", &StringArray::__eq__)    
+      .def("__eq__", &StringArray::__eq__)
       .def_prop_ro("dtype", &StringArray::dtype)
       .def_prop_ro("nbytes", &StringArray::nbytes)
       .def("isna", &StringArray::isna)
       .def("take", &StringArray::take)
+      .def("copy", &StringArray::copy)
+      .def("_concat_same_type", &StringArray::_concat_same_type)
+      .def("interpolate", &StringArray::interpolate)
+
+      // extra interface methods
+      .def("fillna", &StringArray::fillna)
+      .def("dropna", &StringArray::dropna)
+      .def("unique", &StringArray::unique)
 
       // str accessor methods
       .def("len", &StringArray::len)
@@ -862,6 +1085,5 @@ NB_MODULE(nanopandas, m) {
 
       .def("any", &StringArray::any)
       .def("all", &StringArray::all)
-      .def("unique", &StringArray::unique)
       .def("to_pylist", &StringArray::to_pylist);
 }
