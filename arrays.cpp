@@ -74,6 +74,8 @@ public:
   // not copyable
   BoolArray(const BoolArray &rhs) = delete;
 
+  int64_t __len__() const { return array_->length; }
+
   // moving should take ownership of the underlying array
   // TODO: do we need to move array_view?
   BoolArray(BoolArray &&rhs) : BoolArray(std::move(rhs.array_)) {}
@@ -101,9 +103,10 @@ public:
     return result;
   }
 
+  nanoarrow::UniqueArrayView array_view_;
+
 private:
   nanoarrow::UniqueArray array_;
-  nanoarrow::UniqueArrayView array_view_;
 };
 
 class Int64Array {
@@ -160,6 +163,8 @@ public:
   // moving should take ownership of the underlying array
   // TODO: do we need to move array_view?
   Int64Array(Int64Array &&rhs) : Int64Array(std::move(rhs.array_)) {}
+
+  int64_t __len__() const { return array_->length; }
 
   Int64Array &operator=(Int64Array &&rhs) {
     this->array_ = std::move(rhs.array_);
@@ -244,9 +249,10 @@ public:
     return result;
   }
 
+  nanoarrow::UniqueArrayView array_view_;
+
 private:
   nanoarrow::UniqueArray array_;
-  nanoarrow::UniqueArrayView array_view_;
 };
 
 class StringArray {
@@ -262,6 +268,10 @@ public:
 
     if (ArrowArrayStartAppending(array_.get())) {
       throw std::runtime_error("Could not append to StringArray!");
+    }
+
+    if (ArrowArrayReserve(array_.get(), strings.size())) {
+      throw std::runtime_error("Unable to reserve array!");
     }
 
     for (const auto &opt_str : strings) {
@@ -339,6 +349,47 @@ public:
     return StringArray(std::move(result));
   }
 
+  StringArray _from_factorized(const Int64Array &locs,
+                               const StringArray &strings) {
+    nanoarrow::UniqueArray result;
+    if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_LARGE_STRING)) {
+      throw std::runtime_error("Unable to init large string array!");
+    }
+    const auto n = locs.__len__();
+
+    if (ArrowArrayStartAppending(result.get())) {
+      throw std::runtime_error("Could not append to StringArray!");
+    }
+
+    if (ArrowArrayReserve(result.get(), n)) {
+      throw std::runtime_error("Unable to reserve array!");
+    }
+
+    for (int64_t idx = 0; idx < n; idx++) {
+      const auto loc_value =
+          ArrowArrayViewGetIntUnsafe(locs.array_view_.get(), idx);
+      if (loc_value == -1) {
+        if (ArrowArrayAppendNull(result.get(), 1)) {
+          throw std::invalid_argument("Failed to append null!");
+        }
+      } else {
+        const auto sv =
+            ArrowArrayViewGetStringUnsafe(strings.array_view_.get(), loc_value);
+        if (ArrowArrayAppendString(result.get(), sv)) {
+          throw std::runtime_error("failed to append string!");
+        }
+      }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    return StringArray(std::move(result));
+  }
+
   std::optional<std::string> __getitem__(int64_t i) {
     if (i < 0) {
       throw std::range_error("Only positive indexes are supported for now!");
@@ -352,7 +403,7 @@ public:
     }
   }
 
-  int64_t __len__() { return array_->length; }
+  int64_t __len__() const { return array_->length; }
 
   BoolArray __eq__(const StringArray &other) {
     nanoarrow::UniqueArray result;
@@ -1088,6 +1139,8 @@ public:
     return result;
   }
 
+  nanoarrow::UniqueArrayView array_view_;
+
 private:
   BoolArray
   IsFuncApplicator(const std::function<bool(utf8proc_int32_t)> &lambda) {
@@ -1148,7 +1201,6 @@ private:
   }
 
   nanoarrow::UniqueArray array_;
-  nanoarrow::UniqueArrayView array_view_;
 };
 
 // try to match all pandas methods
@@ -1156,10 +1208,12 @@ private:
 NB_MODULE(nanopandas, m) {
   nb::class_<BoolArray>(m, "BoolArray")
       .def(nb::init<std::vector<std::optional<int64_t>>>())
+      .def("__len__", &BoolArray::__len__)
       .def("to_pylist", &BoolArray::to_pylist);
 
   nb::class_<Int64Array>(m, "Int64Array")
       .def(nb::init<std::vector<std::optional<int64_t>>>())
+      .def("__len__", &Int64Array::__len__)
       .def("sum", &Int64Array::sum)
       .def("min", &Int64Array::min)
       .def("max", &Int64Array::max)
@@ -1170,6 +1224,7 @@ NB_MODULE(nanopandas, m) {
 
       // extension array interface
       .def("_from_sequence", &StringArray::_from_sequence)
+      .def("_from_factorized", &StringArray::_from_factorized)
       .def("__getitem__", &StringArray::__getitem__)
       .def("__len__", &StringArray::__len__)
       .def("__eq__", &StringArray::__eq__)

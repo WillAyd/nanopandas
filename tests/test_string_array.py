@@ -11,6 +11,16 @@ def test_from_sequence():
     assert arr[3] == "baz"
 
 
+def test_from_factorized():
+    # TODO: this is not really a classmethod
+    # See https://github.com/wjakob/nanobind/discussions/416
+    base_arr = nanopd.StringArray(["foo", "bar"])
+    locs_arr = nanopd.Int64Array([0, -1, 1, 0, -1])
+    result = nanopd.StringArray([])._from_factorized(locs_arr, base_arr)
+
+    assert result.to_pylist() == ["foo", None, "bar", "foo", None]
+
+
 def test_getitem():
     arr = nanopd.StringArray(["foo", None, "bar", "baz"])
     assert arr[0] == "foo"
