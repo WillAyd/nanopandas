@@ -9,6 +9,8 @@ cmake --build build
 cd build
 ```
 
+You can then run the test suite from the build folder with ``python -m pytest ../tests``
+
 Usage:
 
 ```python
@@ -35,3 +37,4 @@ Note that we use utf8proc for string handling:
 ['ÜÀÉΜ']
 >>> arr.capitalize().to_pylist()
 ['Üàéµ']
+
