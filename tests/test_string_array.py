@@ -13,6 +13,13 @@ def test_len():
     assert len(arr) == 3
 
 
+def test_eq():
+    arr = nanopd.StringArray(["foo", None, "foo", "üàéµ", "üàéµ"])
+    other = nanopd.StringArray(["foo", None, "42", "üàéµ", "üàéµ"])
+    result = arr == other
+    assert result.to_pylist() == [True, None, False, True, True]
+
+
 def test_dtype():
     arr = nanopd.StringArray(["foo", "bar", "baz"])
     assert arr.dtype == "string[arrow]"

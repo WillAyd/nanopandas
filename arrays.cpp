@@ -318,6 +318,59 @@ public:
 
   int64_t __len__() { return array_->length; }
 
+  BoolArray __eq__(const StringArray &other) {
+    nanoarrow::UniqueArray result;
+    if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_BOOL)) {
+      throw std::runtime_error("Unable to init bool array!");
+    }
+    const auto n = array_->length;
+
+    if (n != other.array_->length) {
+      throw std::range_error("Arrays are not of equal size");
+    }
+
+    if (ArrowArrayStartAppending(result.get())) {
+      throw std::runtime_error("Could not start appending");
+    }
+
+    if (ArrowArrayReserve(result.get(), n)) {
+      throw std::runtime_error("Unable to reserve array!");
+    }
+
+    for (int64_t i = 0; i < n; i++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), i)) {
+        if (ArrowArrayAppendNull(result.get(), 1)) {
+          throw std::runtime_error("failed to append null!");
+        }
+      } else {
+        const auto left = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
+        const auto right =
+            ArrowArrayViewGetStringUnsafe(other.array_view_.get(), i);
+        // TODO: we are doing a byte comparison - do we need a unicode compare
+        // instead?
+        const auto nbytes = left.size_bytes;
+        if ((nbytes == right.size_bytes) &&
+            (!strncmp(left.data, right.data, static_cast<size_t>(nbytes)))) {
+          if (ArrowArrayAppendInt(result.get(), 1)) {
+            throw std::runtime_error("failed to append true value!");
+          }
+        } else {
+          if (ArrowArrayAppendInt(result.get(), 0)) {
+            throw std::runtime_error("failed to append false value!");
+          }
+        }
+      }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    return result;
+  }
+
   const char *dtype() { return "string[arrow]"; }
 
   int64_t nbytes() {
@@ -787,6 +840,7 @@ NB_MODULE(nanopandas, m) {
       // extension array methods
       .def("__getitem__", &StringArray::__getitem__)
       .def("__len__", &StringArray::__len__)
+      .def("__eq__", &StringArray::__eq__)    
       .def_prop_ro("dtype", &StringArray::dtype)
       .def_prop_ro("nbytes", &StringArray::nbytes)
       .def("isna", &StringArray::isna)
