@@ -8,6 +8,7 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
+#include <nanobind/stl/tuple.h>
 #include <nanobind/stl/vector.h>
 #include <utf8proc.h>
 
@@ -953,6 +954,86 @@ public:
     return StringArray{result};
   }
 
+  std::tuple<Int64Array, StringArray> factorize() {
+    constexpr auto hashfunc = [](struct ArrowStringView sv) -> size_t {
+      const auto cppsv =
+          std::string_view{sv.data, static_cast<size_t>(sv.size_bytes)};
+      return std::hash<int64_t>()(sv.size_bytes) ^
+             std::hash<std::string_view>()(cppsv);
+    };
+
+    constexpr auto comp = [](struct ArrowStringView sv1,
+                             struct ArrowStringView sv2) -> bool {
+      const int64_t nbytes = sv1.size_bytes;
+      if (nbytes != sv2.size_bytes) {
+        return false;
+      }
+
+      return !strncmp(sv1.data, sv2.data, static_cast<size_t>(nbytes));
+    };
+
+    std::unordered_map<struct ArrowStringView, int64_t, decltype(hashfunc),
+                       decltype(comp)>
+        first_occurances{0, hashfunc, comp};
+
+    nanoarrow::UniqueArray strings;
+    if (ArrowArrayInitFromType(strings.get(), NANOARROW_TYPE_LARGE_STRING)) {
+      throw std::runtime_error("Unable to init string array!");
+    }
+    nanoarrow::UniqueArray locs;
+    if (ArrowArrayInitFromType(locs.get(), NANOARROW_TYPE_INT64)) {
+      throw std::runtime_error("Unable to init int64 array!");
+    }
+    const auto n = array_->length;
+
+    if (ArrowArrayStartAppending(strings.get())) {
+      throw std::runtime_error("Could not start appending");
+    }
+
+    if (ArrowArrayStartAppending(locs.get())) {
+      throw std::runtime_error("Could not start appending");
+    }
+
+    for (int64_t idx = 0; idx < n; idx++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), idx)) {
+        if (ArrowArrayAppendInt(locs.get(), -1)) {
+          throw std::runtime_error("failed to append int!");
+        }
+      } else {
+        const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), idx);
+
+        const auto current_size = static_cast<int64_t>(first_occurances.size());
+        auto did_insert = first_occurances.try_emplace(sv, current_size);
+        if (did_insert.second) {
+          if (ArrowArrayAppendInt(locs.get(), current_size)) {
+            throw std::runtime_error("failed to append int!");
+          }
+          if (ArrowArrayAppendString(strings.get(), sv)) {
+            throw std::runtime_error("failed to append string");
+          }
+        } else {
+          const int64_t existing_loc = did_insert.first->second;
+          if (ArrowArrayAppendInt(locs.get(), existing_loc)) {
+            throw std::runtime_error("failed to append int!");
+          }
+        }
+      }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(strings.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+    if (ArrowArrayFinishBuildingDefault(locs.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    return std::make_tuple(Int64Array{std::move(locs)},
+                           StringArray{std::move(strings)});
+  }
+
   std::vector<std::optional<std::string_view>> to_pylist() {
     const auto n = array_->length;
 
@@ -1068,6 +1149,7 @@ NB_MODULE(nanopandas, m) {
       .def("fillna", &StringArray::fillna)
       .def("dropna", &StringArray::dropna)
       .def("unique", &StringArray::unique)
+      .def("factorize", &StringArray::factorize)
 
       // str accessor methods
       .def("len", &StringArray::len)

@@ -88,6 +88,14 @@ def test_unique():
         expected.remove(result[i])
 
 
+def test_factorize():
+    arr = nanopd.StringArray(["foo", None, "foo", "üàéµ", "üàéµ"])
+    locs, uniqs = arr.factorize()
+
+    assert locs.to_pylist() == [0, -1, 0, 1, 1]
+    assert uniqs.to_pylist() == ["foo", "üàéµ"]
+
+
 # str accessor methods
 def test_len():
     arr = nanopd.StringArray(["foo", None, "bar", "üàéµ", "baz"])
