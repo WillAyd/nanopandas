@@ -226,10 +226,10 @@ public:
     return result;
   }
 
-  std::vector<std::optional<bool>> to_pylist() {
+  std::vector<std::optional<std::int64_t>> to_pylist() {
     const auto n = array_->length;
 
-    std::vector<std::optional<bool>> result;
+    std::vector<std::optional<int64_t>> result;
     result.reserve(n);
     for (int64_t i = 0; i < n; i++) {
       if (ArrowArrayViewIsNull(array_view_.get(), i)) {
@@ -286,6 +286,123 @@ public:
     if (ArrowArrayViewSetArray(array_view_.get(), array_.get(), nullptr)) {
       throw std::runtime_error("Failed to set array view!");
     }
+  }
+
+  StringArray(nanoarrow::UniqueArray &&array) : array_(std::move(array)) {
+    ArrowArrayViewInitFromType(array_view_.get(), NANOARROW_TYPE_LARGE_STRING);
+    struct ArrowError error;
+    if (ArrowArrayViewSetArray(array_view_.get(), array_.get(), &error)) {
+      throw std::runtime_error("Failed to set array view:" +
+                               std::string(error.message));
+    }
+  }
+
+  // not copyable
+  StringArray(const StringArray &rhs) = delete;
+  // moving should take ownership of the underlying array
+  // TODO: do we need to move array_view?
+  StringArray(StringArray &&rhs) : StringArray(std::move(rhs.array_)) {}
+
+  std::optional<std::string> __getitem__(int64_t i) {
+    if (i < 0) {
+      throw std::range_error("Only positive indexes are supported for now!");
+    }
+
+    if (ArrowArrayViewIsNull(array_view_.get(), i)) {
+      return std::nullopt;
+    } else {
+      const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
+      return std::string{sv.data, static_cast<size_t>(sv.size_bytes)};
+    }
+  }
+
+  int64_t __len__() { return array_->length; }
+
+  const char *dtype() { return "string[arrow]"; }
+
+  int64_t nbytes() {
+    struct ArrowBuffer *data_buffer = ArrowArrayBuffer(array_.get(), 1);
+    return data_buffer->size_bytes;
+  }
+
+  // TODO: do we need to support negative indices?
+  BoolArray isna() {
+    nanoarrow::UniqueArray result;
+    if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_BOOL)) {
+      throw std::runtime_error("Unable to init bool array!");
+    }
+    const auto n = array_->length;
+
+    if (ArrowArrayStartAppending(result.get())) {
+      throw std::runtime_error("Could not start appending");
+    }
+
+    if (ArrowArrayReserve(result.get(), n)) {
+      throw std::runtime_error("Unable to reserve array!");
+    }
+
+    for (int64_t i = 0; i < n; i++) {
+      if (ArrowArrayViewIsNull(array_view_.get(), i)) {
+        if (ArrowArrayAppendInt(result.get(), 1)) {
+          throw std::runtime_error("failed to append bool!");
+        }
+      } else {
+        if (ArrowArrayAppendInt(result.get(), 0)) {
+          throw std::runtime_error("failed to append bool!");
+        }
+      }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    return result;
+  }
+
+  StringArray take(const std::vector<int64_t> &indices) {
+    nanoarrow::UniqueArray result;
+    if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_LARGE_STRING)) {
+      throw std::runtime_error("Unable to init large string array!");
+    }
+    const auto n = array_->length;
+
+    if (ArrowArrayStartAppending(result.get())) {
+      throw std::runtime_error("Could not start appending");
+    }
+
+    if (ArrowArrayReserve(result.get(), indices.size())) {
+      throw std::runtime_error("Unable to reserve array!");
+    }
+
+    for (const auto idx : indices) {
+      if (idx < 0) {
+        throw std::range_error("negative indices are not yet implemented");
+      } else if (idx > array_.get()->length) {
+        throw std::range_error("index out of bounds!");
+      } else {
+        if (ArrowArrayViewIsNull(array_view_.get(), idx)) {
+          if (ArrowArrayAppendNull(result.get(), 1)) {
+            throw std::runtime_error("failed to append null!");
+          }
+        } else {
+          const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), idx);
+          if (ArrowArrayAppendString(result.get(), sv)) {
+            throw std::runtime_error("failed to append string!");
+          }
+        }
+      }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    return StringArray(std::move(result));
   }
 
   Int64Array len() {
@@ -546,13 +663,6 @@ public:
   // Misc extras
   int64_t size() { return array_->length; }
 
-  int64_t nbytes() {
-    struct ArrowBuffer *data_buffer = ArrowArrayBuffer(array_.get(), 1);
-    return data_buffer->size_bytes;
-  }
-
-  std::string dtype() { return std::string("large_string[nanoarrow]"); }
-
   bool any() { return array_->length > array_->null_count; }
   bool all() { return array_->null_count == 0; }
 
@@ -673,6 +783,16 @@ NB_MODULE(nanopandas, m) {
 
   nb::class_<StringArray>(m, "StringArray")
       .def(nb::init<std::vector<std::optional<std::string_view>>>())
+
+      // extension array methods
+      .def("__getitem__", &StringArray::__getitem__)
+      .def("__len__", &StringArray::__len__)
+      .def_prop_ro("dtype", &StringArray::dtype)
+      .def_prop_ro("nbytes", &StringArray::nbytes)
+      .def("isna", &StringArray::isna)
+      .def("take", &StringArray::take)
+
+      // str accessor methods
       .def("len", &StringArray::len)
       .def("lower", &StringArray::lower)
       .def("upper", &StringArray::upper)
@@ -685,8 +805,7 @@ NB_MODULE(nanopandas, m) {
       .def("isupper", &StringArray::isupper)
       // some extras that may be useful
       .def_prop_ro("size", &StringArray::size)
-      .def_prop_ro("nbytes", &StringArray::nbytes)
-      .def_prop_ro("dtype", &StringArray::dtype)
+
       .def("any", &StringArray::any)
       .def("all", &StringArray::all)
       .def("unique", &StringArray::unique)
