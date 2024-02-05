@@ -1011,13 +1011,25 @@ public:
   }
 
   StringArray upper() {
-    std::vector<std::optional<std::string>> result;
+    nanoarrow::UniqueArray result;
+    if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_LARGE_STRING)) {
+      throw std::runtime_error("Unable to init large string array!");
+    }
     const auto n = array_->length;
 
-    result.reserve(n);
+    if (ArrowArrayStartAppending(result.get())) {
+      throw std::runtime_error("Could not start appending");
+    }
+
+    if (ArrowArrayReserve(result.get(), n)) {
+      throw std::runtime_error("Unable to reserve array!");
+    }
+
     for (int64_t i = 0; i < n; i++) {
       if (ArrowArrayViewIsNull(array_view_.get(), i)) {
-        result.push_back(std::nullopt);
+        if (ArrowArrayAppendNull(result.get(), 1)) {
+          throw std::runtime_error("failed to append null!");
+        }
       } else {
         const auto sv = ArrowArrayViewGetStringUnsafe(array_view_.get(), i);
         unsigned char *dst;
@@ -1034,18 +1046,23 @@ public:
           throw std::runtime_error("error occurred converting toupper!");
         }
 
-        // utf8proc and std::string but malloc on the heap; maybe we could avoid
-        // a second malloc with a StringArray constructor for raw C pointers
-        std::string converted{};
-        converted.resize(nbytes);
-        memcpy(&converted[0], dst, nbytes);
-        free(dst);
+        struct ArrowStringView dest_sv = {reinterpret_cast<const char *>(dst),
+                                          nbytes};
 
-        result.push_back(std::move(converted));
+        if (ArrowArrayAppendString(result.get(), dest_sv)) {
+          throw std::runtime_error("failed to append string");
+        }
+        free(dst);
       }
     }
 
-    return StringArray{result};
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    return StringArray{std::move(result)};
   }
 
   StringArray capitalize() {
