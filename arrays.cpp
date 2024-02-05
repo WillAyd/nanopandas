@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstring>
 #include <functional>
 #include <limits>
 #include <set>
@@ -20,6 +21,31 @@ static_assert(std::is_same_v<std::uint8_t, char> ||
               "uint8_t must be a typedef for char or unsigned char");
 
 namespace nb = nanobind;
+
+// similar to BitmapInvert from pandas PR #54506 but less safe
+static int InvertInplace(uint8_t *buf, size_t nbytes) {
+  size_t int64_strides = nbytes / sizeof(int64_t);
+  size_t rem = nbytes % sizeof(int64_t);
+
+  uint8_t *cursor = buf;
+  for (size_t i = 0; i < int64_strides; i++) {
+    int64_t value;
+    memcpy(&value, cursor, sizeof(int64_t));
+    value = ~value;
+    memcpy(cursor, &value, sizeof(int64_t));
+    cursor += sizeof(int64_t);
+  }
+
+  for (size_t i = 0; i < rem; i++) {
+    int64_t value;
+    memcpy(&value, cursor, sizeof(int64_t));
+    value = ~value;
+    memcpy(cursor, &value, sizeof(int64_t));
+    cursor++;
+  }
+
+  return 0;
+}
 
 class BoolArray {
 public:
@@ -467,32 +493,26 @@ public:
   }
 
   BoolArray isna() {
-    // This implementation is extremely inefficient; instead of a loop we should
-    // just memcpy the bitmask from array_view_ into the target result data buffer
     nanoarrow::UniqueArray result;
     if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_BOOL)) {
       throw std::runtime_error("Unable to init bool array!");
     }
     const auto n = array_->length;
-
-    if (ArrowArrayStartAppending(result.get())) {
-      throw std::runtime_error("Could not start appending");
+    const int64_t bytes_required = _ArrowBytesForBits(n);
+    struct ArrowBuffer *buffer = ArrowArrayBuffer(result.get(), 1);
+    if (ArrowBufferReserve(buffer, bytes_required)) {
+      throw std::runtime_error("Could not reserve arrow buffer");
     }
 
-    if (ArrowArrayReserve(result.get(), n)) {
-      throw std::runtime_error("Unable to reserve array!");
-    }
+    ArrowBufferAppendUnsafe(buffer, array_view_->buffer_views[0].data.as_uint8,
+                            bytes_required);
+    result->length = n;
+    result->null_count = 0;
 
-    for (int64_t i = 0; i < n; i++) {
-      if (ArrowArrayViewIsNull(array_view_.get(), i)) {
-        if (ArrowArrayAppendInt(result.get(), 1)) {
-          throw std::runtime_error("failed to append bool!");
-        }
-      } else {
-        if (ArrowArrayAppendInt(result.get(), 0)) {
-          throw std::runtime_error("failed to append bool!");
-        }
-      }
+    // Would be more efficient to iterate by word size. See BitmapInvert from
+    // pandas PR #54506
+    if (InvertInplace(buffer->data, bytes_required)) {
+      throw std::runtime_error("Unexpected error with InvertInplace");
     }
 
     struct ArrowError error;
@@ -501,7 +521,7 @@ public:
                                std::string(error.message));
     }
 
-    return result;
+    return BoolArray(std::move(result));
   }
 
   StringArray take(const std::vector<int64_t> &indices) {
