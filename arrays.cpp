@@ -47,7 +47,32 @@ static int InvertInplace(uint8_t *buf, size_t nbytes) {
   return 0;
 }
 
-class BoolArray {
+class ExtensionArray {
+public:
+  ExtensionArray() {}
+
+  // not copyable
+  ExtensionArray(const ExtensionArray &rhs) = delete;
+
+  virtual int64_t __len__() const { return array_->length; }
+
+  ExtensionArray(ExtensionArray &&rhs)
+      : array_view_(std::move(rhs.array_view_)), array_(std::move(rhs.array_)) {
+  }
+
+  ExtensionArray &operator=(ExtensionArray &&rhs) {
+    this->array_ = std::move(rhs.array_);
+    this->array_view_ = std::move(rhs.array_view_);
+    return *this;
+  }
+
+  nanoarrow::UniqueArrayView array_view_;
+
+protected:
+  nanoarrow::UniqueArray array_;
+};
+
+class BoolArray : public ExtensionArray {
 public:
   template <typename C> explicit BoolArray(const C &booleans) {
     // TODO: assert we only get bool or std::optional<bool>
@@ -89,28 +114,14 @@ public:
     }
   }
 
-  BoolArray(nanoarrow::UniqueArray &&array) : array_(std::move(array)) {
+  BoolArray(nanoarrow::UniqueArray &&array) {
+    array_ = std::move(array);
     ArrowArrayViewInitFromType(array_view_.get(), NANOARROW_TYPE_BOOL);
     struct ArrowError error;
     if (ArrowArrayViewSetArray(array_view_.get(), array_.get(), &error)) {
       throw std::runtime_error("Failed to set array view:" +
                                std::string(error.message));
     }
-  }
-
-  // not copyable
-  BoolArray(const BoolArray &rhs) = delete;
-
-  int64_t __len__() const { return array_->length; }
-
-  // moving should take ownership of the underlying array
-  // TODO: do we need to move array_view?
-  BoolArray(BoolArray &&rhs) : BoolArray(std::move(rhs.array_)) {}
-
-  BoolArray &operator=(BoolArray &&rhs) {
-    this->array_ = std::move(rhs.array_);
-    this->array_view_ = std::move(rhs.array_view_);
-    return *this;
   }
 
   std::vector<std::optional<bool>> to_pylist() {
@@ -129,14 +140,9 @@ public:
 
     return result;
   }
-
-  nanoarrow::UniqueArrayView array_view_;
-
-private:
-  nanoarrow::UniqueArray array_;
 };
 
-class Int64Array {
+class Int64Array : public ExtensionArray {
 public:
   template <typename C> explicit Int64Array(const C &integers) {
     // TODO: assert we only get integral or std::optional<integral>
@@ -175,28 +181,14 @@ public:
     }
   }
 
-  Int64Array(nanoarrow::UniqueArray &&array) : array_(std::move(array)) {
+  Int64Array(nanoarrow::UniqueArray &&array) {
+    array_ = std::move(array);
     ArrowArrayViewInitFromType(array_view_.get(), NANOARROW_TYPE_INT64);
     struct ArrowError error;
     if (ArrowArrayViewSetArray(array_view_.get(), array_.get(), &error)) {
       throw std::runtime_error("Failed to set array view:" +
                                std::string(error.message));
     }
-  }
-
-  // not copyable
-  Int64Array(const Int64Array &rhs) = delete;
-
-  // moving should take ownership of the underlying array
-  // TODO: do we need to move array_view?
-  Int64Array(Int64Array &&rhs) : Int64Array(std::move(rhs.array_)) {}
-
-  int64_t __len__() const { return array_->length; }
-
-  Int64Array &operator=(Int64Array &&rhs) {
-    this->array_ = std::move(rhs.array_);
-    this->array_view_ = std::move(rhs.array_view_);
-    return *this;
   }
 
   std::optional<int64_t> sum() {
@@ -275,14 +267,9 @@ public:
 
     return result;
   }
-
-  nanoarrow::UniqueArrayView array_view_;
-
-private:
-  nanoarrow::UniqueArray array_;
 };
 
-class StringArray {
+class StringArray : public ExtensionArray {
 public:
   template <typename C> explicit StringArray(const C &strings) {
     static_assert(std::is_same<typename C::value_type,
@@ -326,7 +313,8 @@ public:
     }
   }
 
-  StringArray(nanoarrow::UniqueArray &&array) : array_(std::move(array)) {
+  StringArray(nanoarrow::UniqueArray &&array) {
+    array_ = std::move(array);
     ArrowArrayViewInitFromType(array_view_.get(), NANOARROW_TYPE_LARGE_STRING);
     struct ArrowError error;
     if (ArrowArrayViewSetArray(array_view_.get(), array_.get(), &error)) {
@@ -335,18 +323,11 @@ public:
     }
   }
 
-  // not copyable
-  StringArray(const StringArray &rhs) = delete;
-  // moving should take ownership of the underlying array
-  // TODO: do we need to move array_view?
-  StringArray(StringArray &&rhs) : StringArray(std::move(rhs.array_)) {}
-
   StringArray _from_sequence(nb::sequence sequence) {
     nanoarrow::UniqueArray result;
     if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_LARGE_STRING)) {
       throw std::runtime_error("Unable to init large string array!");
     }
-    const auto n = array_->length;
 
     if (ArrowArrayStartAppending(result.get())) {
       throw std::runtime_error("Could not start appending");
@@ -429,8 +410,6 @@ public:
       return std::string{sv.data, static_cast<size_t>(sv.size_bytes)};
     }
   }
-
-  int64_t __len__() const { return array_->length; }
 
   BoolArray __eq__(const StringArray &other) {
     nanoarrow::UniqueArray result;
@@ -529,7 +508,6 @@ public:
     if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_LARGE_STRING)) {
       throw std::runtime_error("Unable to init large string array!");
     }
-    const auto n = array_->length;
 
     if (ArrowArrayStartAppending(result.get())) {
       throw std::runtime_error("Could not start appending");
@@ -851,7 +829,7 @@ public:
         }
       }
     } else {
-      struct ArrowStringView next_sv;
+
       int64_t last_append = 0;
       for (int64_t idx = 0; idx < array_.get()->length; idx++) {
         if (ArrowArrayViewIsNull(array_view_.get(), idx)) {
@@ -1316,8 +1294,6 @@ public:
     return result;
   }
 
-  nanoarrow::UniqueArrayView array_view_;
-
 private:
   BoolArray
   IsFuncApplicator(const std::function<bool(utf8proc_int32_t)> &lambda) {
@@ -1376,34 +1352,32 @@ private:
 
     return result;
   }
-
-  nanoarrow::UniqueArray array_;
 };
 
 // try to match all pandas methods
 // https://pandas.pydata.org/pandas-docs/stable/user_guide/text.html#method-summary
 NB_MODULE(nanopandas, m) {
-  nb::class_<BoolArray>(m, "BoolArray")
+  nb::class_<ExtensionArray>(m, "ExtensionArray")
+      .def("__len__", &ExtensionArray::__len__);
+
+  nb::class_<BoolArray, ExtensionArray>(m, "BoolArray")
       .def(nb::init<std::vector<std::optional<int64_t>>>())
-      .def("__len__", &BoolArray::__len__)
       .def("to_pylist", &BoolArray::to_pylist);
 
-  nb::class_<Int64Array>(m, "Int64Array")
+  nb::class_<Int64Array, ExtensionArray>(m, "Int64Array")
       .def(nb::init<std::vector<std::optional<int64_t>>>())
-      .def("__len__", &Int64Array::__len__)
       .def("sum", &Int64Array::sum)
       .def("min", &Int64Array::min)
       .def("max", &Int64Array::max)
       .def("to_pylist", &Int64Array::to_pylist);
 
-  nb::class_<StringArray>(m, "StringArray")
+  nb::class_<StringArray, ExtensionArray>(m, "StringArray")
       .def(nb::init<std::vector<std::optional<std::string_view>>>())
 
       // extension array interface
       .def("_from_sequence", &StringArray::_from_sequence)
       .def("_from_factorized", &StringArray::_from_factorized)
       .def("__getitem__", &StringArray::__getitem__)
-      .def("__len__", &StringArray::__len__)
       .def("__eq__", &StringArray::__eq__)
       .def_prop_ro("dtype", &StringArray::dtype)
       .def_prop_ro("nbytes", &StringArray::nbytes)
