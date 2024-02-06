@@ -44,6 +44,11 @@ else()
   message("Could not find clang-tidy installation - checks disabled")
 endif()
 
+if (USE_SANITIZERS)
+    add_compile_options(-fsanitize=address -fsanitize=undefined)
+    add_link_options(-fsanitize=address -fsanitize=undefined)
+endif()
+
 nanobind_add_module(nanopandas NOMINSIZE arrays.cpp)
 target_link_libraries(nanopandas
   PRIVATE nanoarrow
@@ -52,8 +57,3 @@ target_link_libraries(nanopandas
 set_target_properties(nanoarrow
                       PROPERTIES POSITION_INDEPENDENT_CODE
                       ON)
-
-if (USE_SANITIZERS)
-    add_compile_options(-fsanitize=address -fsanitize=undefined)
-    add_link_options(-fsanitize=address -fsanitize=undefined)
-endif()

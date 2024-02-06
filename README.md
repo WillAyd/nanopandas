@@ -44,5 +44,5 @@ Developing with sanitizers can work. Try this cmake config from the project root
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DUSE_SANITIZERS=ON
 cmake --build build
 cd build
-ASAN_OPTIONS="detect_leaks=0" LD_PRELOAD="$(gcc -print-file-name=libasan.so)" python -m pytest ../tests/
+ASAN_OPTIONS="detect_leaks=0" LD_PRELOAD="$(gcc -print-file-name=libasan.so)" python -m pytest -s ../tests/
 ```
