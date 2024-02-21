@@ -5,6 +5,7 @@
 #include <limits>
 #include <set>
 #include <stddef.h>
+#include <stdint.h>
 #include <unordered_map>
 
 #include <nanoarrow/nanoarrow_types.h>
