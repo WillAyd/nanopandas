@@ -59,13 +59,4 @@ if (USE_SANITIZERS)
     add_link_options(-fsanitize=address -fsanitize=undefined)
 endif()
 
-nanobind_add_module(nanopandas NOMINSIZE arrays.cpp)
-target_link_libraries(nanopandas
-  PRIVATE nanoarrow
-  PRIVATE utf8proc
-)
-set_target_properties(nanoarrow
-                      PROPERTIES POSITION_INDEPENDENT_CODE
-                      ON)
-install(TARGETS nanopandas
-  LIBRARY DESTINATION ${SKBUILD_PROJECT_NAME}/)
+add_subdirectory(src/nanopandas)

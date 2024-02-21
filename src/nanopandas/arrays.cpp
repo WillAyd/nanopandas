@@ -1356,7 +1356,7 @@ private:
 
 // try to match all pandas methods
 // https://pandas.pydata.org/pandas-docs/stable/user_guide/text.html#method-summary
-NB_MODULE(nanopandas, m) {
+NB_MODULE(nanopandaslib, m) {
   nb::class_<ExtensionArray>(m, "ExtensionArray")
       .def("__len__", &ExtensionArray::__len__);
 
