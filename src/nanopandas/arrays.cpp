@@ -973,7 +973,7 @@ public:
           return utf8proc_tolower(codepoint);
         };
 
-        const ssize_t nbytes = utf8proc_map_custom(
+        const utf8proc_ssize_t nbytes = utf8proc_map_custom(
             reinterpret_cast<const uint8_t *>(sv.data), sv.size_bytes, &dst,
             UTF8PROC_STABLE, lambda, NULL);
         if (nbytes < 0) {
@@ -1023,7 +1023,7 @@ public:
           return utf8proc_toupper(codepoint);
         };
 
-        const ssize_t nbytes = utf8proc_map_custom(
+        const utf8proc_ssize_t nbytes = utf8proc_map_custom(
             reinterpret_cast<const uint8_t *>(sv.data), sv.size_bytes, &dst,
             UTF8PROC_STABLE, lambda, NULL);
         if (nbytes < 0) {
