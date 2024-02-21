@@ -35,7 +35,17 @@ FetchContent_Declare(utf8proc-project
   GIT_REPOSITORY https://github.com/JuliaStrings/utf8proc
   GIT_TAG v2.9.0
 )
-FetchContent_MakeAvailable(utf8proc-project)
+# Instead of FetchContent_MakeAvailable(utf8proc-project) we use a custom
+# solution that prevents utf8proc from potentially being installed into a
+# system location on the host
+# See https://mcopik.github.io/blog/2023/cmake/
+#FetchContent_MakeAvailable(utf8proc-project)
+FetchContent_GetProperties(utf8proc-project)
+if(NOT utf8proc-project_POPULATED)
+  FetchContent_Populate(utf8proc-project)
+  add_subdirectory(${utf8proc-project_SOURCE_DIR} ${utf8proc-project_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
+
 
 find_program(CLANG_TIDY_EXE NAMES "clang-tidy")
 if (CLANG_TIDY_EXE_FOUND)
