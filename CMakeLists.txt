@@ -67,3 +67,5 @@ target_link_libraries(nanopandas
 set_target_properties(nanoarrow
                       PROPERTIES POSITION_INDEPENDENT_CODE
                       ON)
+install(TARGETS nanopandas
+  LIBRARY DESTINATION ${SKBUILD_PROJECT_NAME}/)
