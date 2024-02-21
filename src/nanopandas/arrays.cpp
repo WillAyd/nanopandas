@@ -1,8 +1,10 @@
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <functional>
 #include <limits>
 #include <set>
+#include <unordered_map>
 
 #include <nanoarrow/nanoarrow_types.h>
 #include <nanobind/nanobind.h>
@@ -50,6 +52,8 @@ static int InvertInplace(uint8_t *buf, size_t nbytes) {
 class ExtensionArray {
 public:
   ExtensionArray() {}
+
+  virtual ~ExtensionArray() {}
 
   // not copyable
   ExtensionArray(const ExtensionArray &rhs) = delete;
