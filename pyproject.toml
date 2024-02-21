@@ -31,3 +31,5 @@ Source = "https://github.com/willayd/nanopandas"
 
 [tool.cibuildwheel]
 build = "cp39-*64 cp310-*64 cp311-*64 cp312-*64"
+test-command = "pytest {project}/tests"
+test-requires = ["pytest"]
