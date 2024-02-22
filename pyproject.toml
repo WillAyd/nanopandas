@@ -7,7 +7,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "nanopandas"
-version = "0.0.1.dev"
+version = "0.0.dev1"
 description = "Nano implementation of pandas arrays"
 license = {file = "LICENSE"}
 readme = "README.md"
