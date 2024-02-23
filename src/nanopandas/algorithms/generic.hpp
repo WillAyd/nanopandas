@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstring>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -277,9 +278,9 @@ template <typename T> int64_t LenDunder(const T &self) {
 template <typename T> const char *Dtype([[maybe_unused]] const T &self);
 
 template <typename T> int64_t Nbytes(const T &self) {
-  struct ArrowBuffer *data_buffer = ArrowArrayBuffer(
-      const_cast<struct ArrowArray *>(self.array_view_.get()->array), 1);
-  return data_buffer->size_bytes;
+  const struct ArrowBufferView data_buffer =
+      self.array_view_.get()->buffer_views[1];
+  return data_buffer.size_bytes;
 }
 
 template <typename T> int64_t Size(const T &self) {
@@ -568,4 +569,75 @@ std::vector<std::optional<typename T::ScalarT>> ToPyList(const T &self) {
   }
 
   return result;
+}
+
+template <typename T> T ConcatSameType(const T &self, const T &other) {
+  // this implementation assumes that you have a validity and a
+  // data buffer, but that is not enforced by compiler yet
+  // see also specializations in generic.cpp
+  nanoarrow::UniqueArray result;
+  if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
+    throw std::runtime_error(
+        "Unable to init output array for _concat_same_type!");
+  }
+
+  // TODO: check for overflow
+  const auto n = self.array_view_->length + other.array_view_->length;
+
+  if (ArrowArrayStartAppending(result.get())) {
+    throw std::runtime_error("Could not start appending");
+  }
+
+  if (ArrowArrayReserve(result.get(), n)) {
+    throw std::runtime_error("Unable to reserve array!");
+  }
+
+  // TODO: would be great to have a more efficient memcpy based algorithm
+  // to combine the bitmasks
+  for (int64_t idx = 0; idx < self.array_view_.get()->length; idx++) {
+    if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
+      if (ArrowArrayAppendNull(result.get(), 1)) {
+        throw std::runtime_error("failed to append null!");
+      }
+    } else {
+      if (ArrowArrayAppendEmpty(result.get(), 1)) {
+        throw std::runtime_error("failed to append valid!");
+      }
+    }
+  }
+
+  for (int64_t idx = 0; idx < other.array_view_.get()->length; idx++) {
+    if (ArrowArrayViewIsNull(other.array_view_.get(), idx)) {
+      if (ArrowArrayAppendNull(result.get(), 1)) {
+        throw std::runtime_error("failed to append null!");
+      }
+    } else {
+      if (ArrowArrayAppendEmpty(result.get(), 1)) {
+        throw std::runtime_error("failed to append valid!");
+      }
+    }
+  }
+
+  const struct ArrowBufferView left_buffer =
+      self.array_view_.get()->buffer_views[1];
+  const struct ArrowBufferView right_buffer =
+      other.array_view_.get()->buffer_views[1];
+
+  const struct ArrowBuffer *result_buffer =
+      ArrowArrayBuffer(const_cast<struct ArrowArray *>(result.get()), 1);
+
+  const int64_t left_nbytes = left_buffer.size_bytes;
+  const int64_t right_nbytes = right_buffer.size_bytes;
+
+  std::memcpy(result_buffer->data, left_buffer.data.as_uint8, left_nbytes);
+  std::memcpy(result_buffer->data + left_nbytes, right_buffer.data.as_uint8,
+              right_nbytes);
+
+  struct ArrowError error;
+  if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+    throw std::runtime_error("Failed to finish building: " +
+                             std::string(error.message));
+  }
+
+  return T(std::move(result));
 }

@@ -31,7 +31,8 @@ NB_MODULE(nanopandas_ext, m) {
       .def("dropna", &DropNA<BoolArray>)
       .def("_from_sequence", &FromSequence<BoolArray>)
       .def("_from_factorized", &FromFactorized<BoolArray>)
-      .def("to_pylist", &ToPyList<BoolArray>);
+      .def("to_pylist", &ToPyList<BoolArray>)
+      .def("_concat_same_type", &ConcatSameType<BoolArray>);
 
   nb::class_<Int64Array, ExtensionArray>(m, "Int64Array")
       .def(nb::init<std::vector<std::optional<int64_t>>>())
@@ -52,6 +53,7 @@ NB_MODULE(nanopandas_ext, m) {
       .def("_from_sequence", &FromSequence<Int64Array>)
       .def("_from_factorized", &FromFactorized<Int64Array>)
       .def("to_pylist", &ToPyList<Int64Array>)
+      .def("_concat_same_type", &ConcatSameType<Int64Array>)
 
       // integral-specific algorithms
       .def("sum", &Sum<Int64Array>)
@@ -77,6 +79,7 @@ NB_MODULE(nanopandas_ext, m) {
       .def("_from_sequence", &FromSequence<StringArray>)
       .def("_from_factorized", &FromFactorized<StringArray>)
       .def("to_pylist", &ToPyList<StringArray>)
+      .def("_concat_same_type", &ConcatSameType<StringArray>)
 
       // string-specific algorithms
       .def("len", &Len<StringArray>)
