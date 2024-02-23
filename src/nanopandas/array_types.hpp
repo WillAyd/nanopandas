@@ -18,6 +18,7 @@ class BoolArray : public ExtensionArray {
 public:
   using ScalarT = bool;
   static constexpr enum ArrowType ArrowT = NANOARROW_TYPE_BOOL;
+  static constexpr const char Name[20] = "BoolArray";
 
   template <typename C> explicit BoolArray(const C &booleans) {
     // TODO: assert we only get bool or std::optional<bool>
@@ -74,6 +75,7 @@ class Int64Array : public ExtensionArray {
 public:
   using ScalarT = int64_t;
   static constexpr enum ArrowType ArrowT = NANOARROW_TYPE_INT64;
+  static constexpr const char Name[20] = "Int64Array";
 
   template <typename C> explicit Int64Array(const C &integers) {
     // TODO: assert we only get integral or std::optional<integral>
@@ -127,6 +129,7 @@ class StringArray : public ExtensionArray {
 public:
   using ScalarT = std::string_view;
   static constexpr enum ArrowType ArrowT = NANOARROW_TYPE_LARGE_STRING;
+  static constexpr const char Name[20] = "StringArray";
 
   template <typename C> explicit StringArray(const C &strings) {
     static_assert(std::is_same<typename C::value_type,

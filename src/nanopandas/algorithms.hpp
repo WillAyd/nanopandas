@@ -1,6 +1,10 @@
+#include <sstream>
+#include <vector>
+
 #include "array_types.hpp"
 #include <nanobind/nanobind.h>
-#include <vector>
+
+#include <utf8proc.h>
 
 namespace nb = nanobind;
 
@@ -29,11 +33,102 @@ static int InvertInplace(uint8_t *buf, size_t nbytes) {
   return 0;
 }
 
-template <typename T> T FromSequence(nb::sequence sequence) { return T(); }
+template <typename T> T FromSequence(nb::sequence sequence) {
+  nanoarrow::UniqueArray result;
+  if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
+    throw std::runtime_error("Unable to init output array for FromSequence!");
+  }
+
+  if (ArrowArrayStartAppending(result.get())) {
+    throw std::runtime_error("Could not start appending");
+  }
+
+  for (const auto &item : sequence) {
+    if (item.is_none()) {
+      if (ArrowArrayAppendNull(result.get(), 1)) {
+        throw std::runtime_error("failed to append null!");
+      }
+    } else {
+      if constexpr (std::is_same_v<T, BoolArray> ||
+                    std::is_same_v<T, Int64Array>) {
+        auto value = nb::cast<typename T::ScalarT>(item);
+        if (ArrowArrayAppendInt(result.get(), value)) {
+          throw std::runtime_error("failed to append int value!");
+        }
+      } else if constexpr (std::is_same_v<T, StringArray>) {
+        std::string_view sv = nb::cast<std::string_view>(item);
+        const struct ArrowStringView arrow_sv = {
+            sv.data(), static_cast<int64_t>(sv.size())};
+        if (ArrowArrayAppendString(result.get(), arrow_sv)) {
+          throw std::runtime_error("failed to append string!");
+        }
+      } else {
+        // see https://stackoverflow.com/a/64354296/621736
+        static_assert(!sizeof(T), "FromSequence not implemented for type");
+      }
+    }
+  }
+
+  struct ArrowError error;
+  if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+    throw std::runtime_error("Failed to finish building: " +
+                             std::string(error.message));
+  }
+
+  return T(std::move(result));
+}
 
 template <typename T>
 T FromFactorized(const Int64Array &locs, const T &values) {
-  return T();
+  nanoarrow::UniqueArray result;
+  if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
+    throw std::runtime_error("Unable to init output array for FromFactorized!");
+  }
+  const auto n = locs.array_view_->length;
+
+  if (ArrowArrayStartAppending(result.get())) {
+    throw std::runtime_error("Could not append!");
+  }
+
+  if (ArrowArrayReserve(result.get(), n)) {
+    throw std::runtime_error("Unable to reserve array!");
+  }
+
+  for (int64_t idx = 0; idx < n; idx++) {
+    const auto loc_value =
+        ArrowArrayViewGetIntUnsafe(locs.array_view_.get(), idx);
+    if (loc_value == -1) {
+      if (ArrowArrayAppendNull(result.get(), 1)) {
+        throw std::invalid_argument("Failed to append null!");
+      }
+    } else {
+      if constexpr (std::is_same_v<T, BoolArray> ||
+                    std::is_same_v<T, Int64Array>) {
+        const auto value =
+            ArrowArrayViewGetIntUnsafe(values.array_view_.get(), loc_value);
+        if (ArrowArrayAppendInt(result.get(), value)) {
+          throw std::runtime_error("failed to append int!");
+        }
+      } else if constexpr (std::is_same_v<T, StringArray>) {
+        const auto value =
+            ArrowArrayViewGetStringUnsafe(values.array_view_.get(), loc_value);
+        if (ArrowArrayAppendString(result.get(), value)) {
+          throw std::runtime_error("failed to append string!");
+        }
+      } else {
+        // see https://stackoverflow.com/a/64354296/621736
+        static_assert(!sizeof(T), "FromFactorized not implemented for type");
+      }
+    }
+  }
+
+  struct ArrowError error;
+  if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+    throw std::runtime_error("Failed to finish building: " +
+                             std::string(error.message));
+  }
+
+  return T(std::move(result));
 }
 
 template <typename T>
@@ -125,19 +220,69 @@ template <typename T> BoolArray __eq__(T &&self, const T &other) {
   return result;
 }
 
-template <typename T> std::string __repr__(T &&self) {}
+template <typename T> std::string __repr__(T &&self) {
+  std::ostringstream out{};
+  out << T::Name << "\n[";
+
+  const auto n = self.array_view_->length;
+  for (int64_t idx = 0; idx < n; idx++) {
+    if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
+      out << "null";
+    } else {
+
+      if constexpr (std::is_same_v<T, BoolArray>) {
+        const auto value =
+            ArrowArrayViewGetIntUnsafe(self.array_view_.get(), idx);
+        if (value) {
+          out << "True";
+        } else {
+          out << "False";
+        }
+      } else if constexpr (std::is_same_v<T, Int64Array>) {
+        const auto value =
+            ArrowArrayViewGetIntUnsafe(self.array_view_.get(), idx);
+        out << std::to_string(value);
+      } else if constexpr (std::is_same_v<T, StringArray>) {
+        out << "\"";
+        const auto arrow_sv =
+            ArrowArrayViewGetStringUnsafe(self.array_view_.get(), idx);
+
+        const auto nbytes = static_cast<size_t>(arrow_sv.size_bytes);
+        const std::string_view sv{arrow_sv.data, nbytes};
+        out << sv;
+        out << "\"";
+      } else {
+        // see https://stackoverflow.com/a/64354296/621736
+        static_assert(!sizeof(T), "__repr__ not implemented for type");
+      }
+    }
+    if (idx < n - 1) {
+      out << ", ";
+    } else {
+      out << "]";
+    }
+  }
+
+  return out.str();
+}
 
 template <typename T> int64_t __len__(T &&self) {
   return self.array_view_->length;
 }
 
-template <typename T> const char *dtype(T &&self) = delete;
+template <typename T> const char *dtype([[maybe_unused]] T &&self) = delete;
 
-template <> const char *dtype(StringArray &&self) { return "string[arrow]"; }
+template <> const char *dtype([[maybe_unused]] StringArray &&self) {
+  return "string[arrow]";
+}
 
-template <> const char *dtype(BoolArray &&self) { return "boolean[arrow]"; }
+template <> const char *dtype([[maybe_unused]] BoolArray &&self) {
+  return "boolean[arrow]";
+}
 
-template <> const char *dtype(Int64Array &&self) { return "int64[arrow]"; }
+template <> const char *dtype([[maybe_unused]] Int64Array &&self) {
+  return "int64[arrow]";
+}
 
 template <typename T> int64_t nbytes(T &&self) {
   struct ArrowBuffer *data_buffer = ArrowArrayBuffer(
@@ -403,8 +548,6 @@ template <typename T> T dropna(T &&self) {
   return T(std::move(result));
 }
 
-template <typename T> Int64Array len(T &&self) = delete;
-
 template <typename T>
 std::vector<std::optional<typename T::ScalarT>> to_pylist(T &&self) {
   const auto n = self.array_view_->length;
@@ -432,4 +575,58 @@ std::vector<std::optional<typename T::ScalarT>> to_pylist(T &&self) {
   }
 
   return result;
+}
+
+template <typename T> Int64Array len(T &&self) {
+  static_assert(std::is_same_v<T, StringArray>,
+                "len is only implemented for StringArray");
+  nanoarrow::UniqueArray result;
+  if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_INT64)) {
+    throw std::runtime_error("Unable to init int64 array!");
+  }
+  const auto n = self.array_view_->length;
+
+  if (ArrowArrayStartAppending(result.get())) {
+    throw std::runtime_error("Could not start appending");
+  }
+
+  if (ArrowArrayReserve(result.get(), n)) {
+    throw std::runtime_error("Unable to reserve array!");
+  }
+
+  for (int64_t i = 0; i < n; i++) {
+    if (ArrowArrayViewIsNull(self.array_view_.get(), i)) {
+      if (ArrowArrayAppendNull(result.get(), i)) {
+        throw std::runtime_error("failed to append null!");
+      }
+    } else {
+      const auto sv = ArrowArrayViewGetStringUnsafe(self.array_view_.get(), i);
+
+      size_t niter = 0;
+      size_t bytes_read = 0;
+      size_t bytes_rem;
+      while ((bytes_rem = static_cast<size_t>(sv.size_bytes) - bytes_read) >
+             0) {
+        utf8proc_int32_t codepoint;
+        size_t codepoint_bytes = utf8proc_iterate(
+            reinterpret_cast<const utf8proc_uint8_t *>(sv.data + bytes_read),
+            bytes_rem, &codepoint);
+
+        niter++;
+        bytes_read += codepoint_bytes;
+      }
+
+      if (ArrowArrayAppendInt(result.get(), niter)) {
+        throw std::runtime_error("failed to append int!");
+      }
+    }
+  }
+
+  struct ArrowError error;
+  if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+    throw std::runtime_error("Failed to finish building: " +
+                             std::string(error.message));
+  }
+
+  return Int64Array(std::move(result));
 }
