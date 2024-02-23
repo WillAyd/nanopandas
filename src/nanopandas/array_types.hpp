@@ -15,6 +15,7 @@ public: // TODO: can we make these private / protected?
 class BoolArray : public ExtensionArray {
 public:
   using ScalarT = bool;
+  static constexpr enum ArrowType ArrowT = NANOARROW_TYPE_BOOL;
 
   template <typename C> explicit BoolArray(const C &booleans) {
     // TODO: assert we only get bool or std::optional<bool>
@@ -24,7 +25,7 @@ public:
 
     if (ArrowArrayInitFromType(array_.get(), NANOARROW_TYPE_BOOL)) {
       throw std::runtime_error("Unable to init BoolArray!");
-    };
+    }
 
     if (ArrowArrayStartAppending(array_.get())) {
       throw std::runtime_error("Could not append to BoolArray!");
@@ -55,11 +56,22 @@ public:
                                std::string(error.message));
     }
   }
+
+  BoolArray(nanoarrow::UniqueArray &&array) {
+    array_ = std::move(array);
+    ArrowArrayViewInitFromType(array_view_.get(), NANOARROW_TYPE_BOOL);
+    struct ArrowError error;
+    if (ArrowArrayViewSetArray(array_view_.get(), array_.get(), &error)) {
+      throw std::runtime_error("Failed to set array view:" +
+                               std::string(error.message));
+    }
+  }
 };
 
 class Int64Array : public ExtensionArray {
 public:
   using ScalarT = int64_t;
+  static constexpr enum ArrowType ArrowT = NANOARROW_TYPE_INT64;
 
   template <typename C> explicit Int64Array(const C &integers) {
     // TODO: assert we only get integral or std::optional<integral>
@@ -111,7 +123,8 @@ public:
 
 class StringArray : public ExtensionArray {
 public:
-  using ScalarT = std::string;
+  using ScalarT = std::string_view;
+  static constexpr enum ArrowType ArrowT = NANOARROW_TYPE_LARGE_STRING;
 
   template <typename C> explicit StringArray(const C &strings) {
     static_assert(std::is_same<typename C::value_type,

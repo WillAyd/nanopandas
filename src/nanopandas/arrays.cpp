@@ -23,7 +23,12 @@ NB_MODULE(nanopandaslib, m) {
       .def("all", &all<BoolArray>)
       .def("__getitem__", &__getitem__<BoolArray>)
       .def("__eq__", &__eq__<BoolArray>)
-      .def("isna", &isna<BoolArray>);
+      .def("isna", &isna<BoolArray>)
+      .def("take", &take<BoolArray>)
+      .def("copy", &copy<BoolArray>)
+      .def("fillna", &fillna<BoolArray>)
+      .def("dropna", &dropna<BoolArray>)
+      .def("to_pylist", &to_pylist<BoolArray>);
 
   nb::class_<Int64Array, ExtensionArray>(m, "Int64Array")
       .def(nb::init<std::vector<std::optional<int64_t>>>())
@@ -35,7 +40,12 @@ NB_MODULE(nanopandaslib, m) {
       .def("all", &all<Int64Array>)
       .def("__getitem__", &__getitem__<Int64Array>)
       .def("__eq__", &__eq__<Int64Array>)
-      .def("isna", &isna<Int64Array>);
+      .def("isna", &isna<Int64Array>)
+      .def("take", &take<Int64Array>)
+      .def("copy", &copy<Int64Array>)
+      .def("fillna", &fillna<Int64Array>)
+      .def("dropna", &dropna<Int64Array>)
+      .def("to_pylist", &to_pylist<Int64Array>);
 
   nb::class_<StringArray, ExtensionArray>(m, "StringArray")
       .def(nb::init<std::vector<std::optional<std::string_view>>>())
@@ -46,5 +56,10 @@ NB_MODULE(nanopandaslib, m) {
       .def("all", &all<StringArray>)
       .def("__getitem__", &__getitem__<StringArray>)
       .def("__eq__", &__eq__<StringArray>)
-      .def("isna", &isna<StringArray>);
+      .def("isna", &isna<StringArray>)
+      .def("take", &take<StringArray>)
+      .def("copy", &copy<StringArray>)
+      .def("fillna", &fillna<StringArray>)
+      .def("dropna", &dropna<StringArray>)
+      .def("to_pylist", &to_pylist<StringArray>);
 }
