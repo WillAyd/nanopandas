@@ -1,5 +1,8 @@
-nanobind_add_module(nanopandaslib NOMINSIZE arrays.cpp)
-target_link_libraries(nanopandaslib
+nanobind_add_module(nanopandas_ext NOMINSIZE nanopandas_ext.cpp
+  algorithms/string_.cpp
+  algorithms/generic.cpp
+)
+target_link_libraries(nanopandas_ext
   PRIVATE nanoarrow
   PRIVATE utf8proc
 )
@@ -7,7 +10,7 @@ set_target_properties(nanoarrow
                       PROPERTIES POSITION_INDEPENDENT_CODE
                       ON)
 
-install(TARGETS nanopandaslib
+install(TARGETS nanopandas_ext
   LIBRARY DESTINATION ${SKBUILD_PROJECT_NAME}/)
 
 set(SRC_FILES
