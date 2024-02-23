@@ -14,6 +14,8 @@ public: // TODO: can we make these private / protected?
 
 class BoolArray : public ExtensionArray {
 public:
+  using ScalarT = bool;
+
   template <typename C> explicit BoolArray(const C &booleans) {
     // TODO: assert we only get bool or std::optional<bool>
     // static_assert(std::is_integral<typename C::value_type>::value ||
@@ -57,6 +59,8 @@ public:
 
 class Int64Array : public ExtensionArray {
 public:
+  using ScalarT = int64_t;
+
   template <typename C> explicit Int64Array(const C &integers) {
     // TODO: assert we only get integral or std::optional<integral>
     // static_assert(std::is_integral<typename C::value_type>::value ||
@@ -107,6 +111,8 @@ public:
 
 class StringArray : public ExtensionArray {
 public:
+  using ScalarT = std::string;
+
   template <typename C> explicit StringArray(const C &strings) {
     static_assert(std::is_same<typename C::value_type,
                                std::optional<std::string>>::value ||

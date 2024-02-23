@@ -2,6 +2,7 @@
 #include "array_types.hpp"
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/optional.h>
+#include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
 #include <nanobind/stl/vector.h>
 
@@ -19,7 +20,10 @@ NB_MODULE(nanopandaslib, m) {
       .def("nbytes", &nbytes<BoolArray>)
       .def("size", &size<BoolArray>)
       .def("any", &any<BoolArray>)
-      .def("all", &all<BoolArray>);
+      .def("all", &all<BoolArray>)
+      .def("__getitem__", &__getitem__<BoolArray>)
+      .def("__eq__", &__eq__<BoolArray>)
+      .def("isna", &isna<BoolArray>);
 
   nb::class_<Int64Array, ExtensionArray>(m, "Int64Array")
       .def(nb::init<std::vector<std::optional<int64_t>>>())
@@ -28,7 +32,10 @@ NB_MODULE(nanopandaslib, m) {
       .def("nbytes", &nbytes<Int64Array>)
       .def("size", &size<Int64Array>)
       .def("any", &any<Int64Array>)
-      .def("all", &all<Int64Array>);
+      .def("all", &all<Int64Array>)
+      .def("__getitem__", &__getitem__<Int64Array>)
+      .def("__eq__", &__eq__<Int64Array>)
+      .def("isna", &isna<Int64Array>);
 
   nb::class_<StringArray, ExtensionArray>(m, "StringArray")
       .def(nb::init<std::vector<std::optional<std::string_view>>>())
@@ -36,5 +43,8 @@ NB_MODULE(nanopandaslib, m) {
       .def("nbytes", &nbytes<StringArray>)
       .def("size", &size<StringArray>)
       .def("any", &any<StringArray>)
-      .def("all", &all<StringArray>);
+      .def("all", &all<StringArray>)
+      .def("__getitem__", &__getitem__<StringArray>)
+      .def("__eq__", &__eq__<StringArray>)
+      .def("isna", &isna<StringArray>);
 }
