@@ -38,7 +38,8 @@ static int InvertInplace(uint8_t *buf, size_t nbytes) {
   return 0;
 }
 
-template <typename T> T FromSequence(nb::sequence sequence) {
+template <typename T>
+T FromSequence([[maybe_unused]] const T &self, nb::sequence sequence) {
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
     throw std::runtime_error("Unable to init output array for FromSequence!");
@@ -84,7 +85,8 @@ template <typename T> T FromSequence(nb::sequence sequence) {
 }
 
 template <typename T>
-T FromFactorized(const Int64Array &locs, const T &values) {
+T FromFactorized([[maybe_unused]] const T &self, const Int64Array &locs,
+                 const T &values) {
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
     throw std::runtime_error("Unable to init output array for FromFactorized!");
