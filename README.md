@@ -6,10 +6,10 @@ If developing install nanobind then:
 ```sh
 cmake -S . -B build
 cmake --build build
-cd build
+cd build/src
 ```
 
-You can then run the test suite from the build folder with ``python -m pytest ../tests``
+You can then run the test suite from the build folder with ``python -m pytest ../../tests``
 
 Usage:
 
@@ -37,12 +37,13 @@ Note that we use utf8proc for string handling:
 ['ÜÀÉΜ']
 >>> arr.capitalize().to_pylist()
 ['Üàéµ']
+```
 
 Developing with sanitizers can work. Try this cmake config from the project root:
 
 ```
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DUSE_SANITIZERS=ON
 cmake --build build
-cd build
-ASAN_OPTIONS="detect_leaks=0" LD_PRELOAD="$(gcc -print-file-name=libasan.so)" python -m pytest -s ../tests/
+cd build/src
+ASAN_OPTIONS="detect_leaks=0" LD_PRELOAD="$(gcc -print-file-name=libasan.so)" python -m pytest -s ../../tests/
 ```
