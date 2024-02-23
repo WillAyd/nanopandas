@@ -136,7 +136,7 @@ T FromFactorized(const Int64Array &locs, const T &values) {
 }
 
 template <typename T>
-std::optional<typename T::ScalarT> __getitem__(const T &self, int64_t i) {
+std::optional<typename T::ScalarT> GetItemDunder(const T &self, int64_t i) {
   if (i < 0) {
     throw std::range_error("Only positive indexes are supported for now!");
   }
@@ -156,7 +156,7 @@ std::optional<typename T::ScalarT> __getitem__(const T &self, int64_t i) {
   }
 }
 
-template <typename T> BoolArray __eq__(const T &self, const T &other) {
+template <typename T> BoolArray EqDunder(const T &self, const T &other) {
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_BOOL)) {
     throw std::runtime_error("Unable to init bool array!");
@@ -224,7 +224,7 @@ template <typename T> BoolArray __eq__(const T &self, const T &other) {
   return result;
 }
 
-template <typename T> std::string __repr__(const T &self) {
+template <typename T> std::string ReprDunder(const T &self) {
   std::ostringstream out{};
   out << T::Name << "\n[";
 
@@ -270,31 +270,31 @@ template <typename T> std::string __repr__(const T &self) {
   return out.str();
 }
 
-template <typename T> int64_t __len__(const T &self) {
+template <typename T> int64_t LenDunder(const T &self) {
   return self.array_view_->length;
 }
 
-template <typename T> const char *dtype([[maybe_unused]] const T &self);
+template <typename T> const char *Dtype([[maybe_unused]] const T &self);
 
-template <typename T> int64_t nbytes(const T &self) {
+template <typename T> int64_t Nbytes(const T &self) {
   struct ArrowBuffer *data_buffer = ArrowArrayBuffer(
       const_cast<struct ArrowArray *>(self.array_view_.get()->array), 1);
   return data_buffer->size_bytes;
 }
 
-template <typename T> int64_t size(const T &self) {
+template <typename T> int64_t Size(const T &self) {
   return self.array_view_->length;
 }
 
-template <typename T> bool any(const T &self) {
+template <typename T> bool Any(const T &self) {
   return self.array_view_->length > self.array_view_->null_count;
 }
 
-template <typename T> bool all(const T &self) {
+template <typename T> bool All(const T &self) {
   return self.array_view_->null_count == 0;
 }
 
-template <typename T> BoolArray isna(const T &self) {
+template <typename T> BoolArray IsNA(const T &self) {
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_BOOL)) {
     throw std::runtime_error("Unable to init bool array!");
@@ -327,7 +327,7 @@ template <typename T> BoolArray isna(const T &self) {
 }
 
 template <typename T>
-T take(const T &self, const std::vector<int64_t> &indices) {
+T Take(const T &self, const std::vector<int64_t> &indices) {
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
     throw std::runtime_error("Unable to init output array for take!");
@@ -382,7 +382,7 @@ T take(const T &self, const std::vector<int64_t> &indices) {
   return T(std::move(result));
 }
 
-template <typename T> T copy(const T &self) {
+template <typename T> T Copy(const T &self) {
   // This implementation is pretty naive; could be a lot faster if we
   // just memcpy the required buffers
   nanoarrow::UniqueArray result;
@@ -434,7 +434,7 @@ template <typename T> T copy(const T &self) {
   return T(std::move(result));
 }
 
-template <typename T> T fillna(const T &self, typename T::ScalarT replacement) {
+template <typename T> T FillNA(const T &self, typename T::ScalarT replacement) {
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
     throw std::runtime_error("Unable to init output array for fillna!");
@@ -493,7 +493,7 @@ template <typename T> T fillna(const T &self, typename T::ScalarT replacement) {
   return T(std::move(result));
 }
 
-template <typename T> T dropna(const T &self) {
+template <typename T> T DropNA(const T &self) {
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
     throw std::runtime_error("Unable to init dropna output array!");
@@ -542,7 +542,7 @@ template <typename T> T dropna(const T &self) {
 }
 
 template <typename T>
-std::vector<std::optional<typename T::ScalarT>> to_pylist(const T &self) {
+std::vector<std::optional<typename T::ScalarT>> ToPyList(const T &self) {
   const auto n = self.array_view_->length;
   std::vector<std::optional<typename T::ScalarT>> result;
 

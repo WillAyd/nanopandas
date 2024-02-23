@@ -14,7 +14,7 @@ BoolArray IsSpace(const StringArray &self);
 BoolArray IsLower(const StringArray &self);
 BoolArray IsUpper(const StringArray &self);
 
-template <typename T> Int64Array len(const T &self) {
+template <typename T> Int64Array Len(const T &self) {
 
   // maybe in the future this could be generically used for containers too
   static_assert(std::is_same_v<T, StringArray>,
