@@ -136,7 +136,7 @@ T FromFactorized(const Int64Array &locs, const T &values) {
 }
 
 template <typename T>
-std::optional<typename T::ScalarT> __getitem__(T &&self, int64_t i) {
+std::optional<typename T::ScalarT> __getitem__(const T &self, int64_t i) {
   if (i < 0) {
     throw std::range_error("Only positive indexes are supported for now!");
   }
@@ -156,7 +156,7 @@ std::optional<typename T::ScalarT> __getitem__(T &&self, int64_t i) {
   }
 }
 
-template <typename T> BoolArray __eq__(T &&self, const T &other) {
+template <typename T> BoolArray __eq__(const T &self, const T &other) {
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_BOOL)) {
     throw std::runtime_error("Unable to init bool array!");
@@ -224,7 +224,7 @@ template <typename T> BoolArray __eq__(T &&self, const T &other) {
   return result;
 }
 
-template <typename T> std::string __repr__(T &&self) {
+template <typename T> std::string __repr__(const T &self) {
   std::ostringstream out{};
   out << T::Name << "\n[";
 
@@ -270,43 +270,44 @@ template <typename T> std::string __repr__(T &&self) {
   return out.str();
 }
 
-template <typename T> int64_t __len__(T &&self) {
+template <typename T> int64_t __len__(const T &self) {
   return self.array_view_->length;
 }
 
-template <typename T> const char *dtype([[maybe_unused]] T &&self) = delete;
+template <typename T>
+const char *dtype([[maybe_unused]] const T &self) = delete;
 
-template <> const char *dtype([[maybe_unused]] StringArray &&self) {
+template <> const char *dtype([[maybe_unused]] const StringArray &self) {
   return "string[arrow]";
 }
 
-template <> const char *dtype([[maybe_unused]] BoolArray &&self) {
+template <> const char *dtype([[maybe_unused]] const BoolArray &self) {
   return "boolean[arrow]";
 }
 
-template <> const char *dtype([[maybe_unused]] Int64Array &&self) {
+template <> const char *dtype([[maybe_unused]] const Int64Array &self) {
   return "int64[arrow]";
 }
 
-template <typename T> int64_t nbytes(T &&self) {
+template <typename T> int64_t nbytes(const T &self) {
   struct ArrowBuffer *data_buffer = ArrowArrayBuffer(
       const_cast<struct ArrowArray *>(self.array_view_.get()->array), 1);
   return data_buffer->size_bytes;
 }
 
-template <typename T> int64_t size(T &&self) {
+template <typename T> int64_t size(const T &self) {
   return self.array_view_->length;
 }
 
-template <typename T> bool any(T &&self) {
+template <typename T> bool any(const T &self) {
   return self.array_view_->length > self.array_view_->null_count;
 }
 
-template <typename T> bool all(T &&self) {
+template <typename T> bool all(const T &self) {
   return self.array_view_->null_count == 0;
 }
 
-template <typename T> BoolArray isna(T &&self) {
+template <typename T> BoolArray isna(const T &self) {
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_BOOL)) {
     throw std::runtime_error("Unable to init bool array!");
@@ -338,7 +339,8 @@ template <typename T> BoolArray isna(T &&self) {
   return BoolArray(std::move(result));
 }
 
-template <typename T> T take(T &&self, const std::vector<int64_t> &indices) {
+template <typename T>
+T take(const T &self, const std::vector<int64_t> &indices) {
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
     throw std::runtime_error("Unable to init output array for take!");
@@ -393,7 +395,7 @@ template <typename T> T take(T &&self, const std::vector<int64_t> &indices) {
   return T(std::move(result));
 }
 
-template <typename T> T copy(T &&self) {
+template <typename T> T copy(const T &self) {
   // This implementation is pretty naive; could be a lot faster if we
   // just memcpy the required buffers
   nanoarrow::UniqueArray result;
@@ -445,7 +447,7 @@ template <typename T> T copy(T &&self) {
   return T(std::move(result));
 }
 
-template <typename T> T fillna(T &&self, typename T::ScalarT replacement) {
+template <typename T> T fillna(const T &self, typename T::ScalarT replacement) {
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
     throw std::runtime_error("Unable to init output array for fillna!");
@@ -504,7 +506,7 @@ template <typename T> T fillna(T &&self, typename T::ScalarT replacement) {
   return T(std::move(result));
 }
 
-template <typename T> T dropna(T &&self) {
+template <typename T> T dropna(const T &self) {
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
     throw std::runtime_error("Unable to init dropna output array!");
@@ -553,7 +555,7 @@ template <typename T> T dropna(T &&self) {
 }
 
 template <typename T>
-std::vector<std::optional<typename T::ScalarT>> to_pylist(T &&self) {
+std::vector<std::optional<typename T::ScalarT>> to_pylist(const T &self) {
   const auto n = self.array_view_->length;
   std::vector<std::optional<typename T::ScalarT>> result;
 
@@ -581,7 +583,7 @@ std::vector<std::optional<typename T::ScalarT>> to_pylist(T &&self) {
   return result;
 }
 
-template <typename T> Int64Array len(T &&self) {
+template <typename T> Int64Array len(const T &self) {
   static_assert(std::is_same_v<T, StringArray>,
                 "len is only implemented for StringArray");
   nanoarrow::UniqueArray result;
