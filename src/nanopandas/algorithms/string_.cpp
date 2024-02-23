@@ -1,4 +1,4 @@
-#include "string_algorithms.hpp"
+#include "string_.hpp"
 
 #include <array>
 #include <functional>

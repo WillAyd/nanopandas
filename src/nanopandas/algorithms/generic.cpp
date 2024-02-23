@@ -1,4 +1,4 @@
-#include "generic_algorithms.hpp"
+#include "generic.hpp"
 
 template <> const char *dtype([[maybe_unused]] const StringArray &self) {
   return "string[arrow]";

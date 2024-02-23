@@ -1,6 +1,6 @@
 nanobind_add_module(nanopandas_ext NOMINSIZE nanopandas_ext.cpp
-  algorithms/string_algorithms.cpp
-  algorithms/generic_algorithms.cpp
+  algorithms/string_.cpp
+  algorithms/generic.cpp
 )
 target_link_libraries(nanopandas_ext
   PRIVATE nanoarrow
