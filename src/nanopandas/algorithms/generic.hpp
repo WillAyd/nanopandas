@@ -544,6 +544,85 @@ template <typename T> T DropNA(const T &self) {
   return T(std::move(result));
 }
 
+template <typename T> T Interpolate(const T &self) {
+  nanoarrow::UniqueArray result;
+  if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
+    throw std::runtime_error("Unable to init output for interpolate!");
+  }
+
+  // TODO: check for overflow
+  const auto n = self.array_view_->length;
+
+  if (ArrowArrayStartAppending(result.get())) {
+    throw std::runtime_error("Could not start appending");
+  }
+
+  if (ArrowArrayReserve(result.get(), n)) {
+    throw std::runtime_error("Unable to reserve array!");
+  }
+
+  bool seen_value = false;
+  typename T::ScalarT last_value_seen;
+
+  for (int64_t idx = 0; idx < self.array_view_.get()->length; idx++) {
+    if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
+      if (!seen_value) {
+        if (ArrowArrayAppendNull(result.get(), 1)) {
+          throw std::runtime_error("failed to append null!");
+        }
+      } else {
+        if constexpr (std::is_same_v<T, BoolArray> ||
+                      std::is_same_v<T, Int64Array>) {
+          if (ArrowArrayAppendInt(result.get(), last_value_seen)) {
+            throw std::runtime_error("failed to append int value!");
+          }
+        } else if constexpr (std::is_same_v<T, StringArray>) {
+          const struct ArrowStringView sv {
+            last_value_seen.data(), static_cast<int64_t>(last_value_seen.size())
+          };
+          if (ArrowArrayAppendString(result.get(), sv)) {
+            throw std::runtime_error("failed to append string!");
+          }
+        } else {
+          // see https://stackoverflow.com/a/64354296/621736
+          static_assert(!sizeof(T), "interpolate not implemented for type");
+        }
+      }
+    } else {
+      seen_value = true;
+
+      if constexpr (std::is_same_v<T, BoolArray> ||
+                    std::is_same_v<T, Int64Array>) {
+        const auto value =
+            ArrowArrayViewGetIntUnsafe(self.array_view_.get(), idx);
+        if (ArrowArrayAppendInt(result.get(), value)) {
+          throw std::runtime_error("failed to append int!");
+        }
+        last_value_seen = value;
+      } else if constexpr (std::is_same_v<T, StringArray>) {
+        const auto value =
+            ArrowArrayViewGetStringUnsafe(self.array_view_.get(), idx);
+        if (ArrowArrayAppendString(result.get(), value)) {
+          throw std::runtime_error("failed to append string!");
+        }
+        last_value_seen =
+            std::string_view{value.data, static_cast<size_t>(value.size_bytes)};
+      } else {
+        // see https://stackoverflow.com/a/64354296/621736
+        static_assert(!sizeof(T), "interpolate not implemented for type");
+      }
+    }
+  }
+
+  struct ArrowError error;
+  if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+    throw std::runtime_error("Failed to finish building: " +
+                             std::string(error.message));
+  }
+
+  return T(std::move(result));
+}
+
 template <typename T>
 std::vector<std::optional<typename T::ScalarT>> ToPyList(const T &self) {
   const auto n = self.array_view_->length;
