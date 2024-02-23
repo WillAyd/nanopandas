@@ -76,5 +76,11 @@ NB_MODULE(nanopandas_ext, m) {
       .def("len", &len<StringArray>)
       .def("lower", &Lower)
       .def("upper", &Upper)
-      .def("capitalize", &Capitalize);
+      .def("capitalize", &Capitalize)
+      .def("isalnum", &IsAlnum)
+      .def("isalpha", &IsAlpha)
+      .def("isdigit", &IsDigit)
+      .def("isspace", &IsSpace)
+      .def("islower", &IsLower)
+      .def("isupper", &IsUpper);
 }

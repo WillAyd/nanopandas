@@ -7,6 +7,12 @@
 StringArray Lower(const StringArray &self);
 StringArray Upper(const StringArray &self);
 StringArray Capitalize(const StringArray &self);
+BoolArray IsAlnum(const StringArray &self);
+BoolArray IsAlpha(const StringArray &self);
+BoolArray IsDigit(const StringArray &self);
+BoolArray IsSpace(const StringArray &self);
+BoolArray IsLower(const StringArray &self);
+BoolArray IsUpper(const StringArray &self);
 
 template <typename T> Int64Array len(const T &self) {
 
