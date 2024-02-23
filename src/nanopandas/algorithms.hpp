@@ -1,3 +1,5 @@
+#pragma once
+
 #include <sstream>
 #include <vector>
 
@@ -5,6 +7,8 @@
 #include <nanobind/nanobind.h>
 
 #include <utf8proc.h>
+
+#include "string_algorithms.hpp"
 
 namespace nb = nanobind;
 

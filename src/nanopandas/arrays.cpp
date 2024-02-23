@@ -73,5 +73,8 @@ NB_MODULE(nanopandaslib, m) {
       .def("to_pylist", &to_pylist<StringArray>)
 
       // string-specific algorithms
-      .def("len", &len<StringArray>);
+      .def("len", &len<StringArray>)
+      .def("lower", &Lower)
+      .def("upper", &Upper)
+      .def("capitalize", &Capitalize);
 }
