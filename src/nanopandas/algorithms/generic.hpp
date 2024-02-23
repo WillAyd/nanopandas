@@ -155,7 +155,8 @@ std::optional<typename T::ScalarT> GetItemDunder(const T &self, int64_t i) {
     return ArrowArrayViewGetIntUnsafe(self.array_view_.get(), i);
   } else if constexpr (std::is_same_v<T, StringArray>) {
     const auto value = ArrowArrayViewGetStringUnsafe(self.array_view_.get(), i);
-    return std::string{value.data, static_cast<size_t>(value.size_bytes)};
+    return
+        typename T::ScalarT{value.data, static_cast<size_t>(value.size_bytes)};
   } else {
     // see https://stackoverflow.com/a/64354296/621736
     static_assert(!sizeof(T), "__getitem__ not implemented for type");
