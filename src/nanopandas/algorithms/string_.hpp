@@ -35,7 +35,7 @@ template <typename T> Int64Array Len(const T &self) {
 
   for (int64_t i = 0; i < n; i++) {
     if (ArrowArrayViewIsNull(self.array_view_.get(), i)) {
-      if (ArrowArrayAppendNull(result.get(), i)) {
+      if (ArrowArrayAppendNull(result.get(), 1)) {
         throw std::runtime_error("failed to append null!");
       }
     } else {
