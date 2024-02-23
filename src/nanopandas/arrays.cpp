@@ -31,9 +31,9 @@ NB_MODULE(nanopandaslib, m) {
       .def("dropna", &dropna<BoolArray>)
       .def("_from_sequence", &FromSequence<BoolArray>)
       .def("_from_factorized", &FromFactorized<BoolArray>)
-      .def("to_pylist", &to_pylist<BoolArray>);
+      .def("to_pylist", &to_pylist<BoolArray>)
 
-  nb::class_<Int64Array, ExtensionArray>(m, "Int64Array")
+          nb::class_<Int64Array, ExtensionArray>(m, "Int64Array")
       .def(nb::init<std::vector<std::optional<int64_t>>>())
       .def("__len__", &__len__<Int64Array>)
       .def_prop_ro("dtype", &dtype<Int64Array>)

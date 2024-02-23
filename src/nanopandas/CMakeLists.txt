@@ -1,4 +1,7 @@
-nanobind_add_module(nanopandaslib NOMINSIZE arrays.cpp)
+nanobind_add_module(nanopandaslib NOMINSIZE arrays.cpp
+  algorithms/string_algorithms.cpp
+  algorithms/generic_algorithms.cpp
+)
 target_link_libraries(nanopandaslib
   PRIVATE nanoarrow
   PRIVATE utf8proc
