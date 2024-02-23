@@ -9,6 +9,8 @@
 class ExtensionArray {
 public: // TODO: can we make these private / protected?
   nanoarrow::UniqueArrayView array_view_;
+
+protected:
   nanoarrow::UniqueArray array_;
 };
 

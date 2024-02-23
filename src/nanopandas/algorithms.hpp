@@ -62,9 +62,9 @@ template <typename T> BoolArray __eq__(T &&self, const T &other) {
   if (ArrowArrayInitFromType(result.get(), NANOARROW_TYPE_BOOL)) {
     throw std::runtime_error("Unable to init bool array!");
   }
-  const auto n = self.array_->length;
+  const auto n = self.array_view_->length;
 
-  if (n != other.array_->length) {
+  if (n != other.array_view_->length) {
     throw std::range_error("Arrays are not of equal size");
   }
 
@@ -127,7 +127,9 @@ template <typename T> BoolArray __eq__(T &&self, const T &other) {
 
 template <typename T> std::string __repr__(T &&self) {}
 
-template <typename T> int64_t __len__(T &&self) { return self.array_->length; }
+template <typename T> int64_t __len__(T &&self) {
+  return self.array_view_->length;
+}
 
 template <typename T> const char *dtype(T &&self) = delete;
 
@@ -138,18 +140,21 @@ template <> const char *dtype(BoolArray &&self) { return "boolean[arrow]"; }
 template <> const char *dtype(Int64Array &&self) { return "int64[arrow]"; }
 
 template <typename T> int64_t nbytes(T &&self) {
-  struct ArrowBuffer *data_buffer = ArrowArrayBuffer(self.array_.get(), 1);
+  struct ArrowBuffer *data_buffer = ArrowArrayBuffer(
+      const_cast<struct ArrowArray *>(self.array_view_.get()->array), 1);
   return data_buffer->size_bytes;
 }
 
-template <typename T> int64_t size(T &&self) { return self.array_->length; }
+template <typename T> int64_t size(T &&self) {
+  return self.array_view_->length;
+}
 
 template <typename T> bool any(T &&self) {
-  return self.array_->length > self.array_->null_count;
+  return self.array_view_->length > self.array_view_->null_count;
 }
 
 template <typename T> bool all(T &&self) {
-  return self.array_->null_count == 0;
+  return self.array_view_->null_count == 0;
 }
 
 template <typename T> BoolArray isna(T &&self) {
@@ -308,7 +313,7 @@ template <typename T> T fillna(T &&self, typename T::ScalarT replacement) {
   }
 
   if constexpr (std::is_same_v<T, BoolArray> || std::is_same_v<T, Int64Array>) {
-    for (int64_t idx = 0; idx < self.array_.get()->length; idx++) {
+    for (int64_t idx = 0; idx < self.array_view_.get()->length; idx++) {
       if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
         if (ArrowArrayAppendInt(result.get(), replacement)) {
           throw std::runtime_error("failed to append int!");
@@ -323,7 +328,7 @@ template <typename T> T fillna(T &&self, typename T::ScalarT replacement) {
   } else if constexpr (std::is_same_v<T, StringArray>) {
     const struct ArrowStringView replacement_sv = {
         replacement.data(), static_cast<int64_t>(replacement.size())};
-    for (int64_t idx = 0; idx < self.array_.get()->length; idx++) {
+    for (int64_t idx = 0; idx < self.array_view_.get()->length; idx++) {
       if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
         if (ArrowArrayAppendString(result.get(), replacement_sv)) {
           throw std::runtime_error("failed to append string!");
