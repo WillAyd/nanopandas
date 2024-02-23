@@ -51,7 +51,12 @@ NB_MODULE(nanopandas_ext, m) {
       .def("dropna", &dropna<Int64Array>)
       .def("_from_sequence", &FromSequence<Int64Array>)
       .def("_from_factorized", &FromFactorized<Int64Array>)
-      .def("to_pylist", &to_pylist<Int64Array>);
+      .def("to_pylist", &to_pylist<Int64Array>)
+
+      // integral-specific algorithms
+      .def("sum", &Sum<Int64Array>)
+      .def("min", &Min<Int64Array>)
+      .def("max", &Max<Int64Array>);
 
   nb::class_<StringArray, ExtensionArray>(m, "StringArray")
       .def(nb::init<std::vector<std::optional<std::string_view>>>())
