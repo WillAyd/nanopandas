@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstring>
+#include <functional>
 #include <optional>
 #include <set>
 #include <sstream>
@@ -810,6 +811,93 @@ template <typename T> T Unique(const T &self) {
   }
 
   return T(std::move(result));
+}
+
+template <typename T> std::tuple<Int64Array, T> Factorize(const T &self) {
+  std::unordered_map<typename T::ScalarT, int64_t> first_occurances;
+
+  nanoarrow::UniqueArray values;
+  if (ArrowArrayInitFromType(values.get(), T::ArrowT)) {
+    throw std::runtime_error("Unable to init array for values!");
+  }
+  nanoarrow::UniqueArray locs;
+  if (ArrowArrayInitFromType(locs.get(), NANOARROW_TYPE_INT64)) {
+    throw std::runtime_error("Unable to init int64 array!");
+  }
+  const auto n = self.array_view_->length;
+
+  if (ArrowArrayStartAppending(values.get())) {
+    throw std::runtime_error("Could not start appending");
+  }
+
+  if (ArrowArrayStartAppending(locs.get())) {
+    throw std::runtime_error("Could not start appending");
+  }
+
+  for (int64_t idx = 0; idx < n; idx++) {
+    if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
+      if (ArrowArrayAppendInt(locs.get(), -1)) {
+        throw std::runtime_error("failed to append int!");
+      }
+    } else {
+      const auto current_size = static_cast<int64_t>(first_occurances.size());
+
+      if constexpr (std::is_same_v<T, BoolArray> ||
+                    std::is_same_v<T, Int64Array>) {
+        const auto value =
+            ArrowArrayViewGetIntUnsafe(self.array_view_.get(), idx);
+        auto did_insert = first_occurances.try_emplace(value, current_size);
+        if (did_insert.second) {
+          if (ArrowArrayAppendInt(locs.get(), current_size)) {
+            throw std::runtime_error("failed to append int!");
+          }
+          if (ArrowArrayAppendInt(values.get(), value)) {
+            throw std::runtime_error("failed to append string");
+          }
+        } else {
+          const int64_t existing_loc = did_insert.first->second;
+          if (ArrowArrayAppendInt(locs.get(), existing_loc)) {
+            throw std::runtime_error("failed to append int!");
+          }
+        }
+      } else if constexpr (std::is_same_v<T, StringArray>) {
+        const auto sv =
+            ArrowArrayViewGetStringUnsafe(self.array_view_.get(), idx);
+        const std::string_view value{sv.data,
+                                     static_cast<size_t>(sv.size_bytes)};
+
+        auto did_insert = first_occurances.try_emplace(value, current_size);
+        if (did_insert.second) {
+          if (ArrowArrayAppendInt(locs.get(), current_size)) {
+            throw std::runtime_error("failed to append int!");
+          }
+          if (ArrowArrayAppendString(values.get(), sv)) {
+            throw std::runtime_error("failed to append string");
+          }
+        } else {
+          const int64_t existing_loc = did_insert.first->second;
+          if (ArrowArrayAppendInt(locs.get(), existing_loc)) {
+            throw std::runtime_error("failed to append int!");
+          }
+        }
+      } else {
+        // see https://stackoverflow.com/a/64354296/621736
+        static_assert(!sizeof(T), "Factorize not implemented for type");
+      }
+    }
+  }
+
+  struct ArrowError error;
+  if (ArrowArrayFinishBuildingDefault(values.get(), &error)) {
+    throw std::runtime_error("Failed to finish building: " +
+                             std::string(error.message));
+  }
+  if (ArrowArrayFinishBuildingDefault(locs.get(), &error)) {
+    throw std::runtime_error("Failed to finish building: " +
+                             std::string(error.message));
+  }
+
+  return std::make_tuple(Int64Array{std::move(locs)}, T{std::move(values)});
 }
 
 template <typename T>

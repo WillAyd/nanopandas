@@ -4,6 +4,7 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
+#include <nanobind/stl/tuple.h>
 #include <nanobind/stl/vector.h>
 
 namespace nb = nanobind;
@@ -31,6 +32,7 @@ NB_MODULE(nanopandas_ext, m) {
       .def("dropna", &DropNA<BoolArray>)
       .def("interpolate", &Interpolate<BoolArray>)
       .def("unique", &Unique<BoolArray>)
+      .def("factorize", &Factorize<BoolArray>)
       .def("_pad_or_backfill", &PadOrBackfill<BoolArray>)
       .def("_from_sequence", &FromSequence<BoolArray>)
       .def("_from_factorized", &FromFactorized<BoolArray>)
@@ -55,6 +57,7 @@ NB_MODULE(nanopandas_ext, m) {
       .def("dropna", &DropNA<Int64Array>)
       .def("interpolate", &Interpolate<Int64Array>)
       .def("unique", &Unique<Int64Array>)
+      .def("factorize", &Factorize<Int64Array>)
       .def("_pad_or_backfill", &PadOrBackfill<Int64Array>)
       .def("_from_sequence", &FromSequence<Int64Array>)
       .def("_from_factorized", &FromFactorized<Int64Array>)
@@ -84,6 +87,7 @@ NB_MODULE(nanopandas_ext, m) {
       .def("dropna", &DropNA<StringArray>)
       .def("interpolate", &Interpolate<StringArray>)
       .def("unique", &Unique<StringArray>)
+      .def("factorize", &Factorize<StringArray>)
       .def("_pad_or_backfill", &PadOrBackfill<StringArray>)
       .def("_from_sequence", &FromSequence<StringArray>)
       .def("_from_factorized", &FromFactorized<StringArray>)
