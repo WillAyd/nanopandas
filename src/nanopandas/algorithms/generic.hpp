@@ -143,18 +143,21 @@ T FromFactorized([[maybe_unused]] const T &self, const Int64Array &locs,
 
 template <typename T>
 std::optional<typename T::ScalarT> GetItemDunder(const T &self, int64_t i) {
-  if (i < 0) {
-    throw std::range_error("Only positive indexes are supported for now!");
+  const auto n = self.array_view_.get()->length;
+  if ((i >= n) || (i < -n)) {
+    throw std::range_error("index out of bounds!");
   }
+  const auto idx = i >= 0 ? i : n + i;
 
-  if (ArrowArrayViewIsNull(self.array_view_.get(), i)) {
+  if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
     return std::nullopt;
   }
 
   if constexpr (std::is_same_v<T, BoolArray> || std::is_same_v<T, Int64Array>) {
-    return ArrowArrayViewGetIntUnsafe(self.array_view_.get(), i);
+    return ArrowArrayViewGetIntUnsafe(self.array_view_.get(), idx);
   } else if constexpr (std::is_same_v<T, StringArray>) {
-    const auto value = ArrowArrayViewGetStringUnsafe(self.array_view_.get(), i);
+    const auto value =
+        ArrowArrayViewGetStringUnsafe(self.array_view_.get(), idx);
     return
         typename T::ScalarT{value.data, static_cast<size_t>(value.size_bytes)};
   } else {
@@ -287,6 +290,10 @@ template <typename T> int64_t Nbytes(const T &self) {
   const struct ArrowBufferView data_buffer =
       self.array_view_.get()->buffer_views[1];
   return data_buffer.size_bytes;
+}
+
+template <typename T> std::tuple<int64_t> Shape(const T &self) {
+  return std::make_tuple(self.array_view_->length);
 }
 
 template <typename T> int64_t Size(const T &self) {
