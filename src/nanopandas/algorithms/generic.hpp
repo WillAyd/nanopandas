@@ -356,34 +356,35 @@ T Take(const T &self, const std::vector<int64_t> &indices) {
     throw std::runtime_error("Unable to reserve array!");
   }
 
-  for (const auto idx : indices) {
-    if (idx < 0) {
-      throw std::range_error("negative indices are not yet implemented");
-    } else if (idx > self.array_view_.get()->length) {
+  const auto n = self.array_view_.get()->length;
+
+  for (const auto index : indices) {
+    if ((index >= n) || (index < -n)) {
       throw std::range_error("index out of bounds!");
+    }
+
+    const auto idx = index >= 0 ? index : n + index;
+    if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
+      if (ArrowArrayAppendNull(result.get(), 1)) {
+        throw std::runtime_error("failed to append null!");
+      }
     } else {
-      if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
-        if (ArrowArrayAppendNull(result.get(), 1)) {
-          throw std::runtime_error("failed to append null!");
+      if constexpr (std::is_same_v<T, BoolArray> ||
+                    std::is_same_v<T, Int64Array>) {
+        const auto value =
+            ArrowArrayViewGetIntUnsafe(self.array_view_.get(), idx);
+        if (ArrowArrayAppendInt(result.get(), value)) {
+          throw std::runtime_error("failed to append int!");
+        }
+      } else if constexpr (std::is_same_v<T, StringArray>) {
+        const auto sv =
+            ArrowArrayViewGetStringUnsafe(self.array_view_.get(), idx);
+        if (ArrowArrayAppendString(result.get(), sv)) {
+          throw std::runtime_error("failed to append string!");
         }
       } else {
-        if constexpr (std::is_same_v<T, BoolArray> ||
-                      std::is_same_v<T, Int64Array>) {
-          const auto value =
-              ArrowArrayViewGetIntUnsafe(self.array_view_.get(), idx);
-          if (ArrowArrayAppendInt(result.get(), value)) {
-            throw std::runtime_error("failed to append int!");
-          }
-        } else if constexpr (std::is_same_v<T, StringArray>) {
-          const auto sv =
-              ArrowArrayViewGetStringUnsafe(self.array_view_.get(), idx);
-          if (ArrowArrayAppendString(result.get(), sv)) {
-            throw std::runtime_error("failed to append string!");
-          }
-        } else {
-          // see https://stackoverflow.com/a/64354296/621736
-          static_assert(!sizeof(T), "take not implemented for type");
-        }
+        // see https://stackoverflow.com/a/64354296/621736
+        static_assert(!sizeof(T), "take not implemented for type");
       }
     }
   }
