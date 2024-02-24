@@ -53,6 +53,11 @@ def test_nbytes():
     assert arr.nbytes == 32
 
 
+def test_shape():
+    arr = nanopd.StringArray(["foo", "bar", "baz"])
+    assert arr.shape == (3,)
+
+
 def test_isna():
     arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
     result = arr.isna()
