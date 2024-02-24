@@ -308,13 +308,21 @@ template <typename T> BoolArray IsNA(const T &self) {
   }
   const auto n = self.array_view_->length;
   const int64_t bytes_required = _ArrowBytesForBits(n);
+
+  const uint8_t *src = self.array_view_->buffer_views[0].data.as_uint8;
   struct ArrowBuffer *buffer = ArrowArrayBuffer(result.get(), 1);
-  if (ArrowBufferReserve(buffer, bytes_required)) {
-    throw std::runtime_error("Could not reserve arrow buffer");
+
+  if (src == nullptr) {
+    if (ArrowBufferAppendFill(buffer, 255, bytes_required)) {
+      throw std::runtime_error("ArrowBufferAppendFill failed");
+    }
+  } else {
+    if (ArrowBufferReserve(buffer, bytes_required)) {
+      throw std::runtime_error("Could not reserve arrow buffer");
+    }
+    ArrowBufferAppendUnsafe(buffer, src, bytes_required);
   }
 
-  ArrowBufferAppendUnsafe(
-      buffer, self.array_view_->buffer_views[0].data.as_uint8, bytes_required);
   result->length = n;
   result->null_count = 0;
 
