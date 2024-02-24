@@ -75,6 +75,12 @@ def test_take():
     assert result.to_pylist() == ["foo", None, None, "foo"]
 
 
+def test_negative_take():
+    arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
+    result = arr.take([0, -1, -1, 0])
+    assert result.to_pylist() == ["foo", "baz", "baz", "foo"]
+
+
 def test_copy():
     arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
     result = arr.copy()
