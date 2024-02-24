@@ -58,6 +58,16 @@ def test_isna():
     result = arr.isna()
     assert result.to_pylist() == [False, True, False, True, False]
 
+def test_isna_no_missing():
+    arr = nanopd.StringArray(["foo", "bar", "baz"])
+    result = arr.isna()
+    assert result.to_pylist() == [False, False, False]
+
+def test_isna_no_data():
+    arr = nanopd.StringArray([])
+    result = arr.isna()
+    assert result.to_pylist() == []
+
 
 def test_take():
     arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
