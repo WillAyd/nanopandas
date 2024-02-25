@@ -175,12 +175,11 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
   int64_t i;
   if (nb::try_cast(indexer, i, false)) {
     if (const auto result = GetItemDunderInternal(self, i)) {
-      if constexpr (std::is_same_v<T, BoolArray>) {
-        return nb::bool_(*result);
-      } else if constexpr (std::is_same_v<T, Int64Array>) {
-        return nb::int_(*result);
+      if constexpr (std::is_same_v<T, BoolArray> ||
+                    std::is_same_v<T, Int64Array>) {
+        return typename T::PyObjectT(*result);
       } else if constexpr (std::is_same_v<T, StringArray>) {
-        return nb::str(result->data(), result->size());
+        return typename T::PyObjectT(result->data(), result->size());
       } else {
         // see https://stackoverflow.com/a/64354296/621736
         static_assert(!sizeof(T), "__getitem__ not implemented for type");
@@ -200,12 +199,11 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
     for (const auto idx : values) {
       if (idx) {
         if (const auto value = GetItemDunderInternal(self, *idx)) {
-          if constexpr (std::is_same_v<T, BoolArray>) {
-            result.append(nb::bool_(*value));
-          } else if constexpr (std::is_same_v<T, Int64Array>) {
-            result.append(nb::int_(*value));
+          if constexpr (std::is_same_v<T, BoolArray> ||
+                        std::is_same_v<T, Int64Array>) {
+            result.append(typename T::PyObjectT(*value));
           } else if constexpr (std::is_same_v<T, StringArray>) {
-            result.append(nb::str(value->data(), value->size()));
+            result.append(typename T::PyObjectT(value->data(), value->size()));
           } else {
             // see https://stackoverflow.com/a/64354296/621736
             static_assert(!sizeof(T), "__getitem__ not implemented for type");
@@ -253,12 +251,11 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
       const auto should_index = v(idx);
       if (should_index) {
         if (const auto value = GetItemDunderInternal(self, idx)) {
-          if constexpr (std::is_same_v<T, BoolArray>) {
-            result.append(nb::bool_(*value));
-          } else if constexpr (std::is_same_v<T, Int64Array>) {
-            result.append(nb::int_(*value));
+          if constexpr (std::is_same_v<T, BoolArray> ||
+                        std::is_same_v<T, Int64Array>) {
+            result.append(typename T::PyObjectT(*value));
           } else if constexpr (std::is_same_v<T, StringArray>) {
-            result.append(nb::str(value->data(), value->size()));
+            result.append(typename T::PyObjectT(value->data(), value->size()));
           } else {
             // see https://stackoverflow.com/a/64354296/621736
             static_assert(!sizeof(T), "__getitem__ not implemented for type");
