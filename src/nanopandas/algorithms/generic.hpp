@@ -241,12 +241,8 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
     }
 
     nb::handle py_type = nb::type<T>();
-    nb::object py_inst = nb::inst_alloc(py_type);
-    T *ptr = nb::inst_ptr<T>(py_inst);
-    new (ptr) T(std::move(result));
-    nb::inst_ready(py_inst);
-
-    return py_inst;
+    T *out = new T(std::move(result));
+    return nb::inst_take_ownership(py_type, out);
   }
 
   /*
@@ -312,10 +308,8 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
     }
 
     nb::handle py_type = nb::type<T>();
-    nb::object py_inst = nb::inst_alloc(py_type);
-    T *ptr = nb::inst_ptr<T>(py_inst);
-    new (ptr) T(std::move(result));
-    nb::inst_ready(py_inst);
+    T *out = new T(std::move(result));
+    return nb::inst_take_ownership(py_type, out);
   }
 
   throw std::out_of_range(
