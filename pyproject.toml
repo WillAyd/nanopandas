@@ -1,7 +1,7 @@
 [build-system]
 requires = [
   "scikit-build-core",
-  "nanobind",
+  "nanobind>=1.9.2",
 ]
 build-backend = "scikit_build_core.build"
 

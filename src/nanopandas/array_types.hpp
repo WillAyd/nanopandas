@@ -6,6 +6,8 @@
 #include <string>
 #include <string_view>
 
+namespace nb = nanobind;
+
 class ExtensionArray {
 public: // TODO: can we make these private / protected?
   nanoarrow::UniqueArrayView array_view_;
@@ -17,6 +19,7 @@ protected:
 class BoolArray : public ExtensionArray {
 public:
   using ScalarT = bool;
+  using PyObjectT = nb::bool_;
   static constexpr enum ArrowType ArrowT = NANOARROW_TYPE_BOOL;
   static constexpr const char Name[20] = "BoolArray";
 
@@ -74,6 +77,7 @@ public:
 class Int64Array : public ExtensionArray {
 public:
   using ScalarT = int64_t;
+  using PyObjectT = nb::int_;
   static constexpr enum ArrowType ArrowT = NANOARROW_TYPE_INT64;
   static constexpr const char Name[20] = "Int64Array";
 
@@ -128,6 +132,7 @@ public:
 class StringArray : public ExtensionArray {
 public:
   using ScalarT = std::string_view;
+  using PyObjectT = nb::str;
   static constexpr enum ArrowType ArrowT = NANOARROW_TYPE_LARGE_STRING;
   static constexpr const char Name[20] = "StringArray";
 

@@ -10,6 +10,7 @@
 #include <vector>
 
 #include <nanobind/nanobind.h>
+#include <nanobind/ndarray.h>
 #include <utf8proc.h>
 
 #include "../array_types.hpp"
@@ -142,13 +143,14 @@ T FromFactorized([[maybe_unused]] const T &self, const Int64Array &locs,
 }
 
 template <typename T>
-std::optional<typename T::ScalarT> GetItemDunder(const T &self, int64_t i) {
+auto GetItemDunderInternal(const T &self, int64_t index)
+    -> std::optional<typename T::ScalarT> {
   const auto n = self.array_view_.get()->length;
-  if ((i >= n) || (i < -n)) {
-    throw std::range_error("index out of bounds!");
+  if ((index >= n) || (index < -n)) {
+    throw std::out_of_range("index out of bounds");
   }
-  const auto idx = i >= 0 ? i : n + i;
 
+  const auto idx = index >= 0 ? index : n + index;
   if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
     return std::nullopt;
   }
@@ -158,12 +160,165 @@ std::optional<typename T::ScalarT> GetItemDunder(const T &self, int64_t i) {
   } else if constexpr (std::is_same_v<T, StringArray>) {
     const auto value =
         ArrowArrayViewGetStringUnsafe(self.array_view_.get(), idx);
+
     return
         typename T::ScalarT{value.data, static_cast<size_t>(value.size_bytes)};
   } else {
     // see https://stackoverflow.com/a/64354296/621736
     static_assert(!sizeof(T), "__getitem__ not implemented for type");
   }
+}
+
+template <typename T>
+auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
+
+  int64_t i;
+  if (nb::try_cast(indexer, i, false)) {
+    if (const auto result = GetItemDunderInternal(self, i)) {
+      if constexpr (std::is_same_v<T, BoolArray> ||
+                    std::is_same_v<T, Int64Array>) {
+        return typename T::PyObjectT(*result);
+      } else if constexpr (std::is_same_v<T, StringArray>) {
+        return typename T::PyObjectT(result->data(), result->size());
+      } else {
+        // see https://stackoverflow.com/a/64354296/621736
+        static_assert(!sizeof(T), "__getitem__ not implemented for type");
+      }
+    } else {
+      return nb::none();
+    }
+  }
+
+  // At this point we are working with an iterable
+  // TODO: we are falling back to return Python containers, but ideally we
+  // should still return T wrapped as a Python object
+  nanoarrow::UniqueArray result;
+  if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
+    throw std::runtime_error("Unable to init output array for take!");
+  }
+
+  if (ArrowArrayStartAppending(result.get())) {
+    throw std::runtime_error("Could not start appending");
+  }
+
+  std::vector<std::optional<int64_t>> values;
+  if (nb::try_cast(indexer, values, false)) {
+    for (const auto idx : values) {
+      if (idx) {
+        if (const auto value = GetItemDunderInternal(self, *idx)) {
+          if constexpr (std::is_same_v<T, BoolArray> ||
+                        std::is_same_v<T, Int64Array>) {
+            if (ArrowArrayAppendInt(result.get(), *value)) {
+              throw std::runtime_error("failed to append int!");
+            }
+          } else if constexpr (std::is_same_v<T, StringArray>) {
+            const struct ArrowStringView sv {
+              value->data(), static_cast<int64_t>(value->size())
+            };
+            if (ArrowArrayAppendString(result.get(), sv)) {
+              throw std::runtime_error("failed to append string!");
+            }
+          } else {
+            // see https://stackoverflow.com/a/64354296/621736
+            static_assert(!sizeof(T), "__getitem__ not implemented for type");
+          }
+        } else {
+          if (ArrowArrayAppendNull(result.get(), 1)) {
+            throw std::runtime_error("failed to append null!");
+          }
+        }
+      } else {
+        if (ArrowArrayAppendNull(result.get(), 1)) {
+          throw std::runtime_error("failed to append null!");
+        }
+      }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    nb::handle py_type = nb::type<T>();
+    nb::object py_inst = nb::inst_alloc(py_type);
+    T *ptr = nb::inst_ptr<T>(py_inst);
+    *ptr = T(std::move(result));
+
+    return py_inst;
+  }
+
+  /*
+  nb::ndarray<const int64_t, nb::ndim<1>> array;
+  if (nb::try_cast(indexer, array, false)) {
+    auto v = array.view();
+    for (size_t idx = 0; idx < v.shape(0); idx++) {
+      if (const auto value = GetItemDunderInternal(self, idx)) {
+        if constexpr (std::is_same_v<T, BoolArray>) {
+          result.append(nb::bool_(*value));
+        } else if constexpr (std::is_same_v<T, Int64Array>) {
+          result.append(nb::int_(*value));
+        } else if constexpr (std::is_same_v<T, StringArray>) {
+          result.append(nb::str(value->data(), value->size()));
+        } else {
+          // see https://stackoverflow.com/a/64354296/621736
+          static_assert(!sizeof(T), "__getitem__ not implemented for type");
+        }
+      } else {
+        result.append(nb::none());
+      }
+    }
+
+    return result;
+  }
+  */
+
+  nb::ndarray<const bool, nb::ndim<1>> array;
+  if (nb::try_cast(indexer, array, false)) {
+    auto v = array.view();
+    for (size_t idx = 0; idx < v.shape(0); idx++) {
+      const auto should_index = v(idx);
+      if (should_index) {
+        if (const auto value = GetItemDunderInternal(self, idx)) {
+          if constexpr (std::is_same_v<T, BoolArray> ||
+                        std::is_same_v<T, Int64Array>) {
+            if (ArrowArrayAppendInt(result.get(), *value)) {
+              throw std::runtime_error("failed to append int!");
+            }
+          } else if constexpr (std::is_same_v<T, StringArray>) {
+            const struct ArrowStringView sv {
+              value->data(), static_cast<int64_t>(value->size())
+            };
+            if (ArrowArrayAppendString(result.get(), sv)) {
+              throw std::runtime_error("failed to append string!");
+            }
+          } else {
+            // see https://stackoverflow.com/a/64354296/621736
+            static_assert(!sizeof(T), "__getitem__ not implemented for type");
+          }
+        } else {
+          if (ArrowArrayAppendNull(result.get(), 1)) {
+            throw std::runtime_error("failed to append null!");
+          }
+        }
+      }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    nb::handle py_type = nb::type<T>();
+    nb::object py_inst = nb::inst_alloc(py_type);
+    T *ptr = nb::inst_ptr<T>(py_inst);
+    *ptr = T(std::move(result));
+  }
+
+  throw std::out_of_range(
+      "only integers, slices (`:`), ellipsis (`...`), numpy.newaxis "
+      "(`None`) and integer or boolean arrays are valid indices");
 }
 
 template <typename T> BoolArray EqDunder(const T &self, const T &other) {
