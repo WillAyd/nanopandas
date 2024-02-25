@@ -192,7 +192,14 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
   // At this point we are working with an iterable
   // TODO: we are falling back to return Python containers, but ideally we
   // should still return T wrapped as a Python object
-  nb::list result{};
+  nanoarrow::UniqueArray result;
+  if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
+    throw std::runtime_error("Unable to init output array for take!");
+  }
+
+  if (ArrowArrayStartAppending(result.get())) {
+    throw std::runtime_error("Could not start appending");
+  }
 
   std::vector<std::optional<int64_t>> values;
   if (nb::try_cast(indexer, values, false)) {
@@ -201,22 +208,44 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
         if (const auto value = GetItemDunderInternal(self, *idx)) {
           if constexpr (std::is_same_v<T, BoolArray> ||
                         std::is_same_v<T, Int64Array>) {
-            result.append(typename T::PyObjectT(*value));
+            if (ArrowArrayAppendInt(result.get(), *value)) {
+              throw std::runtime_error("failed to append int!");
+            }
           } else if constexpr (std::is_same_v<T, StringArray>) {
-            result.append(typename T::PyObjectT(value->data(), value->size()));
+            const struct ArrowStringView sv {
+              value->data(), static_cast<int64_t>(value->size())
+            };
+            if (ArrowArrayAppendString(result.get(), sv)) {
+              throw std::runtime_error("failed to append string!");
+            }
           } else {
             // see https://stackoverflow.com/a/64354296/621736
             static_assert(!sizeof(T), "__getitem__ not implemented for type");
           }
         } else {
-          result.append(nb::none());
+          if (ArrowArrayAppendNull(result.get(), 1)) {
+            throw std::runtime_error("failed to append null!");
+          }
         }
       } else {
-        result.append(nb::none());
+        if (ArrowArrayAppendNull(result.get(), 1)) {
+          throw std::runtime_error("failed to append null!");
+        }
       }
     }
 
-    return result;
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    nb::handle py_type = nb::type<T>();
+    nb::object py_inst = nb::inst_alloc(py_type);
+    T *ptr = nb::inst_ptr<T>(py_inst);
+    *ptr = T(std::move(result));
+
+    return py_inst;
   }
 
   /*
@@ -253,20 +282,38 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
         if (const auto value = GetItemDunderInternal(self, idx)) {
           if constexpr (std::is_same_v<T, BoolArray> ||
                         std::is_same_v<T, Int64Array>) {
-            result.append(typename T::PyObjectT(*value));
+            if (ArrowArrayAppendInt(result.get(), *value)) {
+              throw std::runtime_error("failed to append int!");
+            }
           } else if constexpr (std::is_same_v<T, StringArray>) {
-            result.append(typename T::PyObjectT(value->data(), value->size()));
+            const struct ArrowStringView sv {
+              value->data(), static_cast<int64_t>(value->size())
+            };
+            if (ArrowArrayAppendString(result.get(), sv)) {
+              throw std::runtime_error("failed to append string!");
+            }
           } else {
             // see https://stackoverflow.com/a/64354296/621736
             static_assert(!sizeof(T), "__getitem__ not implemented for type");
           }
         } else {
-          result.append(nb::none());
+          if (ArrowArrayAppendNull(result.get(), 1)) {
+            throw std::runtime_error("failed to append null!");
+          }
         }
       }
     }
 
-    return result;
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    nb::handle py_type = nb::type<T>();
+    nb::object py_inst = nb::inst_alloc(py_type);
+    T *ptr = nb::inst_ptr<T>(py_inst);
+    *ptr = T(std::move(result));
   }
 
   throw std::out_of_range(
