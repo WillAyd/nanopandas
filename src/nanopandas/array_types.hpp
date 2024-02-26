@@ -172,7 +172,8 @@ public:
   };
   using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
   static constexpr AppendFuncPtrT ArrowAppendFunc =
-      [](struct ArrowArray *array, ArrowScalarT value) -> ArrowErrorCode {
+      [](struct ArrowArray *array,
+         struct ArrowStringView value) -> ArrowErrorCode {
     return ArrowArrayAppendString(array, value);
   };
 
