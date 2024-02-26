@@ -60,11 +60,6 @@ def test_eq():
     assert result.to_pylist() == [True, None, False, True, True]
 
 
-def test_dtype():
-    arr = nanopd.StringArray(["foo", "bar", "baz"])
-    assert arr.dtype == "string[arrow]"
-
-
 def test_nbytes():
     arr = nanopd.StringArray(["foo", "bar", "baz"])
     assert arr.nbytes == 32
@@ -265,3 +260,33 @@ def test_any():
 def test_all():
     arr = nanopd.StringArray(["FOO", None, "foo", "ÜÀÉΜ", "üàéµ"])
     assert arr.all() == False
+
+
+# dtype tests
+def test_dtype_str():
+    arr = nanopd.StringArray(["FOO", None, "foo", "ÜÀÉΜ", "üàéµ"])
+    assert str(arr.dtype) == "string[nanoarrow]"
+
+
+def test_dtype_na_value():
+    arr = nanopd.StringArray(["FOO", None, "foo", "ÜÀÉΜ", "üàéµ"])
+    assert arr.dtype.na_value is None
+
+
+def test_dtype_kind():
+    arr = nanopd.StringArray(["FOO", None, "foo", "ÜÀÉΜ", "üàéµ"])
+    assert arr.dtype.kind == "O"
+
+
+def test_dtype_name():
+    arr = nanopd.StringArray(["FOO", None, "foo", "ÜÀÉΜ", "üàéµ"])
+    assert arr.dtype.name == "string[nanoarrow]"
+
+def test_dtype_is_numeric():
+    arr = nanopd.StringArray(["FOO", None, "foo", "ÜÀÉΜ", "üàéµ"])
+    assert not arr.dtype.is_numeric
+
+
+def test_dtype_is_boolean():
+    arr = nanopd.StringArray(["FOO", None, "foo", "ÜÀÉΜ", "üàéµ"])
+    assert not arr.dtype.is_boolean
