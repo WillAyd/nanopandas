@@ -25,9 +25,11 @@ public:
   static constexpr const char Name[20] = "BoolArray";
 
   using ArrowScalarT = int64_t;
-  using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
+  using GetFuncPtrT = ArrowScalarT (*const)(const struct ArrowArrayView *,
+                                            int64_t);
   static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetIntUnsafe;
-  using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
+  using AppendFuncPtrT = ArrowErrorCode (*const)(struct ArrowArray *,
+                                                 ArrowScalarT);
   static constexpr AppendFuncPtrT ArrowAppendFunc = &ArrowArrayAppendInt;
 
   template <typename C> explicit BoolArray(const C &booleans) {
@@ -89,9 +91,11 @@ public:
   static constexpr const char Name[20] = "Int64Array";
 
   using ArrowScalarT = int64_t;
-  using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
+  using GetFuncPtrT = ArrowScalarT (*const)(const struct ArrowArrayView *,
+                                            int64_t);
   static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetIntUnsafe;
-  using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
+  using AppendFuncPtrT = ArrowErrorCode (*const)(struct ArrowArray *,
+                                                 ArrowScalarT);
   static constexpr AppendFuncPtrT ArrowAppendFunc = &ArrowArrayAppendInt;
 
   template <typename C> explicit Int64Array(const C &integers) {
@@ -150,9 +154,11 @@ public:
   static constexpr const char Name[20] = "StringArray";
 
   using ArrowScalarT = struct ArrowStringView;
-  using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
+  using GetFuncPtrT = ArrowScalarT (*const)(const struct ArrowArrayView *,
+                                            int64_t);
   static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetStringUnsafe;
-  using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
+  using AppendFuncPtrT = ArrowErrorCode (*const)(struct ArrowArray *,
+                                                 ArrowScalarT);
   static constexpr AppendFuncPtrT ArrowAppendFunc = &ArrowArrayAppendString;
 
   template <typename C> explicit StringArray(const C &strings) {
