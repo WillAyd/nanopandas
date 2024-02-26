@@ -27,13 +27,14 @@ public:
   using ArrowScalarT = int64_t;
   using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
   static constexpr GetFuncPtrT ArrowGetFunc =
-      [](const struct ArrowArrayView *array_view,
-         int64_t index) -> ArrowScalarT {
-    return ArrowArrayViewGetIntUnsafe(array_view, index);
-  };
+      [](const struct ArrowArrayView *array_view, int64_t index) ->
+      typename BoolArray::ArrowScalarT {
+        return ArrowArrayViewGetIntUnsafe(array_view, index);
+      };
   using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
   static constexpr AppendFuncPtrT ArrowAppendFunc =
-      [](struct ArrowArray *array, ArrowScalarT value) -> ArrowErrorCode {
+      [](struct ArrowArray *array,
+         typename BoolArray::ArrowScalarT value) -> ArrowErrorCode {
     return ArrowArrayAppendInt(array, value);
   };
 
@@ -98,13 +99,14 @@ public:
   using ArrowScalarT = int64_t;
   using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
   static constexpr GetFuncPtrT ArrowGetFunc =
-      [](const struct ArrowArrayView *array_view,
-         int64_t index) -> ArrowScalarT {
-    return ArrowArrayViewGetIntUnsafe(array_view, index);
-  };
+      [](const struct ArrowArrayView *array_view, int64_t index) ->
+      typename Int64Array::ArrowScalarT {
+        return ArrowArrayViewGetIntUnsafe(array_view, index);
+      };
   using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
   static constexpr AppendFuncPtrT ArrowAppendFunc =
-      [](struct ArrowArray *array, ArrowScalarT value) -> ArrowErrorCode {
+      [](struct ArrowArray *array,
+         typename Int64Array::ArrowScalarT value) -> ArrowErrorCode {
     return ArrowArrayAppendInt(array, value);
   };
 
@@ -166,14 +168,14 @@ public:
   using ArrowScalarT = struct ArrowStringView;
   using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
   static constexpr GetFuncPtrT ArrowGetFunc =
-      [](const struct ArrowArrayView *array_view,
-         int64_t index) -> ArrowScalarT {
-    return ArrowArrayViewGetStringUnsafe(array_view, index);
-  };
+      [](const struct ArrowArrayView *array_view, int64_t index) ->
+      typename StringArray::ArrowScalarT {
+        return ArrowArrayViewGetStringUnsafe(array_view, index);
+      };
   using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
   static constexpr AppendFuncPtrT ArrowAppendFunc =
       [](struct ArrowArray *array,
-         struct ArrowStringView value) -> ArrowErrorCode {
+         typename StringArray::ArrowScalarT value) -> ArrowErrorCode {
     return ArrowArrayAppendString(array, value);
   };
 
