@@ -25,9 +25,19 @@ public:
   static constexpr const char Name[20] = "BoolArray";
 
   using ArrowScalarT = int64_t;
+#ifdef _MSC_VER
+  using GetFuncPtrT = ArrowScalarT(__cdecl *)(const struct ArrowArrayView *,
+                                              int64_t);
+#else
   using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
+#endif
   static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetIntUnsafe;
+#ifdef _MSC_VER
+  using AppendFuncPtrT = ArrowErrorCode(__cdecl *)(struct ArrowArray *,
+                                                   ArrowScalarT);
+#else
   using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
+#endif
   static constexpr AppendFuncPtrT ArrowAppendFunc = &ArrowArrayAppendInt;
 
   template <typename C> explicit BoolArray(const C &booleans) {
@@ -89,9 +99,19 @@ public:
   static constexpr const char Name[20] = "Int64Array";
 
   using ArrowScalarT = int64_t;
+#ifdef _MSC_VER
+  using GetFuncPtrT = ArrowScalarT(__cdecl *)(const struct ArrowArrayView *,
+                                              int64_t);
+#else
   using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
+#endif
   static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetIntUnsafe;
+#ifdef _MSC_VER
+  using AppendFuncPtrT = ArrowErrorCode(__cdecl *)(struct ArrowArray *,
+                                                   ArrowScalarT);
+#else
   using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
+#endif
   static constexpr AppendFuncPtrT ArrowAppendFunc = &ArrowArrayAppendInt;
 
   template <typename C> explicit Int64Array(const C &integers) {
@@ -150,10 +170,20 @@ public:
   static constexpr const char Name[20] = "StringArray";
 
   using ArrowScalarT = struct ArrowStringView;
+#ifdef _MSC_VER
+  using GetFuncPtrT = ArrowScalarT(__cdecl *)(const struct ArrowArrayView *,
+                                              int64_t);
+#else
   using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
+#endif
   static constexpr GetFuncPtrT ArrowGetFunc =
       (const GetFuncPtrT)&ArrowArrayViewGetStringUnsafe;
+#ifdef _MSC_VER
+  using AppendFuncPtrT = ArrowErrorCode(__cdecl *)(struct ArrowArray *,
+                                                   ArrowScalarT);
+#else
   using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
+#endif
   static constexpr AppendFuncPtrT ArrowAppendFunc =
       (const AppendFuncPtrT)(&ArrowArrayAppendString);
 
