@@ -16,6 +16,7 @@ jobs:
       - uses: actions/setup-python@v3
       - name: Build with sanitizers
         run: |
+          python -m pip install nanobind
           cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebug -DUSE_SANITIZERS=ON
           cmake --build build
       - name: Test with sanitizers
