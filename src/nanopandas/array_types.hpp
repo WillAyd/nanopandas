@@ -26,14 +26,14 @@ public:
 
   using ArrowScalarT = int64_t;
   using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
-#ifdef MSVC
+#ifdef _MSC_VER
   static constexpr GetFuncPtrT ArrowGetFunc =
       (GetFuncPtrT)&ArrowArrayViewGetIntUnsafe;
 #else
   static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetIntUnsafe;
 #endif
   using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
-#ifdef MSVC
+#ifdef _MSC_VER
   static constexpr AppendFuncPtrT ArrowAppendFunc =
       (AppendFuncPtrT)&ArrowArrayAppendInt;
 #else
@@ -100,14 +100,14 @@ public:
 
   using ArrowScalarT = int64_t;
   using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
-#ifdef MSVC
+#ifdef _MSC_VER
   static constexpr GetFuncPtrT ArrowGetFunc =
       (GetFuncPtrT)&ArrowArrayViewGetIntUnsafe;
 #else
   static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetIntUnsafe;
 #endif
   using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
-#ifdef MSVC
+#ifdef _MSC_VER
   static constexpr AppendFuncPtrT ArrowAppendFunc =
       (AppendFuncPtrT)&ArrowArrayAppendInt;
 #else
@@ -171,14 +171,14 @@ public:
 
   using ArrowScalarT = struct ArrowStringView;
   using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
-#ifdef MSVC
+#ifdef _MSC_VER
   static constexpr GetFuncPtrT ArrowGetFunc =
       (GetFuncPtrT)&ArrowArrayViewGetStringUnsafe;
 #else
   static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetStringUnsafe;
 #endif
   using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
-#ifdef MSVC
+#ifdef _MSC_VER
   static constexpr AppendFuncPtrT ArrowAppendFunc =
       (AppendFuncPtrT)&ArrowArrayAppendString;
 #else
