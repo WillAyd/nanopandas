@@ -152,10 +152,10 @@ public:
   using ArrowScalarT = struct ArrowStringView;
   using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
   static constexpr GetFuncPtrT ArrowGetFunc =
-      (GetFuncPtrT)(&ArrowArrayViewGetStringUnsafe);
+      (const GetFuncPtrT)&ArrowArrayViewGetStringUnsafe;
   using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
   static constexpr AppendFuncPtrT ArrowAppendFunc =
-      (AppendFuncPtrT)(&ArrowArrayAppendString);
+      (const AppendFuncPtrT)(&ArrowArrayAppendString);
 
   template <typename C> explicit StringArray(const C &strings) {
     static_assert(std::is_same<typename C::value_type,
