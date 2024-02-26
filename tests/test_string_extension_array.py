@@ -38,6 +38,10 @@ class NanoStringDtype(ExtensionDtype):
     def _is_boolean(self):
         return False
 
+    @property
+    def _is_immutable(self) -> bool:
+        return True
+
 
 @pytest.fixture
 def dtype():
@@ -82,6 +86,12 @@ def na_value(dtype):
 @pytest.fixture
 def data_for_grouping():
     return nanopd.StringArray(["baz", "baz", None, None, "bar", "bar", "foo"])
+
+
+@pytest.fixture(params=[True, False])
+def box_in_series(request):
+    """Whether to box the data in a Series"""
+    return request.param
 
 
 @pytest.fixture
