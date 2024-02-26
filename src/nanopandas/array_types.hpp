@@ -25,12 +25,20 @@ public:
   static constexpr const char Name[20] = "BoolArray";
 
   using ArrowScalarT = int64_t;
-  using GetFuncPtrT = ArrowScalarT (*const)(const struct ArrowArrayView *,
-                                            int64_t);
+  using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
+#ifdef MSVC
+  static constexpr GetFuncPtrT ArrowGetFunc =
+      (GetFuncPtrT)&ArrowArrayViewGetIntUnsafe;
+#else
   static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetIntUnsafe;
-  using AppendFuncPtrT = ArrowErrorCode (*const)(struct ArrowArray *,
-                                                 ArrowScalarT);
+#endif
+  using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
+#ifdef MSVC
+  static constexpr AppendFuncPtrT ArrowAppendFunc =
+      (AppendFuncPtrT)&ArrowArrayAppendInt;
+#else
   static constexpr AppendFuncPtrT ArrowAppendFunc = &ArrowArrayAppendInt;
+#endif
 
   template <typename C> explicit BoolArray(const C &booleans) {
     // TODO: assert we only get bool or std::optional<bool>
@@ -91,12 +99,20 @@ public:
   static constexpr const char Name[20] = "Int64Array";
 
   using ArrowScalarT = int64_t;
-  using GetFuncPtrT = ArrowScalarT (*const)(const struct ArrowArrayView *,
-                                            int64_t);
+  using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
+#ifdef MSVC
+  static constexpr GetFuncPtrT ArrowGetFunc =
+      (GetFuncPtrT)&ArrowArrayViewGetIntUnsafe;
+#else
   static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetIntUnsafe;
-  using AppendFuncPtrT = ArrowErrorCode (*const)(struct ArrowArray *,
-                                                 ArrowScalarT);
+#endif
+  using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
+#ifdef MSVC
+  static constexpr AppendFuncPtrT ArrowAppendFunc =
+      (AppendFuncPtrT)&ArrowArrayAppendInt;
+#else
   static constexpr AppendFuncPtrT ArrowAppendFunc = &ArrowArrayAppendInt;
+#endif
 
   template <typename C> explicit Int64Array(const C &integers) {
     // TODO: assert we only get integral or std::optional<integral>
@@ -154,12 +170,20 @@ public:
   static constexpr const char Name[20] = "StringArray";
 
   using ArrowScalarT = struct ArrowStringView;
-  using GetFuncPtrT = ArrowScalarT (*const)(const struct ArrowArrayView *,
-                                            int64_t);
+  using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
+#ifdef MSVC
+  static constexpr GetFuncPtrT ArrowGetFunc =
+      (GetFuncPtrT)&ArrowArrayViewGetStringUnsafe;
+#else
   static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetStringUnsafe;
-  using AppendFuncPtrT = ArrowErrorCode (*const)(struct ArrowArray *,
-                                                 ArrowScalarT);
+#endif
+  using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
+#ifdef MSVC
+  static constexpr AppendFuncPtrT ArrowAppendFunc =
+      (AppendFuncPtrT)&ArrowArrayAppendString;
+#else
   static constexpr AppendFuncPtrT ArrowAppendFunc = &ArrowArrayAppendString;
+#endif
 
   template <typename C> explicit StringArray(const C &strings) {
     static_assert(std::is_same<typename C::value_type,
