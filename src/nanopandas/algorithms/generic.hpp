@@ -485,7 +485,9 @@ template <typename T> int64_t LenDunder(const T &self) {
   return self.array_view_->length;
 }
 
-template <typename T> const char *Dtype([[maybe_unused]] const T &self);
+template <typename T> ExtensionDtype<T> Dtype([[maybe_unused]] const T &self) {
+  return ExtensionDtype<T>{};
+}
 
 template <typename T> int64_t Nbytes(const T &self) {
   const struct ArrowBufferView data_buffer =
