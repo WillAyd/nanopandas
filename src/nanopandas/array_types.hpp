@@ -176,16 +176,14 @@ public:
 #else
   using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
 #endif
-  static constexpr GetFuncPtrT ArrowGetFunc =
-      (const GetFuncPtrT)&ArrowArrayViewGetStringUnsafe;
+  static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetStringUnsafe;
 #ifdef _MSC_VER
   using AppendFuncPtrT = ArrowErrorCode(__cdecl *)(struct ArrowArray *,
                                                    ArrowScalarT);
 #else
   using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
 #endif
-  static constexpr AppendFuncPtrT ArrowAppendFunc =
-      (const AppendFuncPtrT)(&ArrowArrayAppendString);
+  static constexpr AppendFuncPtrT ArrowAppendFunc = &ArrowArrayAppendString;
 
   template <typename C> explicit StringArray(const C &strings) {
     static_assert(std::is_same<typename C::value_type,
