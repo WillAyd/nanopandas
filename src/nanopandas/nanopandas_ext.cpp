@@ -40,6 +40,16 @@ NB_MODULE(nanopandas_ext, m) {
       .def("to_pylist", &ToPyList<BoolArray>)
       .def("_concat_same_type", &ConcatSameType<BoolArray>);
 
+  nb::class_<ExtensionDtype<BoolArray>>(m, "StringDtype")
+      .def("__str__", &ExtensionDtype<BoolArray>::Str)
+      .def_prop_ro("na_value", &ExtensionDtype<BoolArray>::NaValue)
+      .def_prop_ro("kind", &ExtensionDtype<BoolArray>::Kind)
+      .def_prop_ro("name", &ExtensionDtype<BoolArray>::Name)
+      .def_prop_ro("is_numeric", &ExtensionDtype<BoolArray>::IsNumeric)
+      .def_prop_ro("is_boolean", &ExtensionDtype<BoolArray>::IsBoolean)
+      .def_prop_ro("_can_hold_na", &ExtensionDtype<BoolArray>::CanHoldNA)
+      .def_prop_ro("_is_immutable", &ExtensionDtype<BoolArray>::IsImmutable);
+
   nb::class_<Int64Array, ExtensionArray>(m, "Int64Array")
       .def(nb::init<std::vector<std::optional<int64_t>>>())
       .def("__len__", &LenDunder<Int64Array>)
@@ -70,6 +80,16 @@ NB_MODULE(nanopandas_ext, m) {
       .def("sum", &Sum<Int64Array>)
       .def("min", &Min<Int64Array>)
       .def("max", &Max<Int64Array>);
+
+  nb::class_<ExtensionDtype<Int64Array>>(m, "StringDtype")
+      .def("__str__", &ExtensionDtype<Int64Array>::Str)
+      .def_prop_ro("na_value", &ExtensionDtype<Int64Array>::NaValue)
+      .def_prop_ro("kind", &ExtensionDtype<Int64Array>::Kind)
+      .def_prop_ro("name", &ExtensionDtype<Int64Array>::Name)
+      .def_prop_ro("is_numeric", &ExtensionDtype<Int64Array>::IsNumeric)
+      .def_prop_ro("is_boolean", &ExtensionDtype<Int64Array>::IsBoolean)
+      .def_prop_ro("_can_hold_na", &ExtensionDtype<Int64Array>::CanHoldNA)
+      .def_prop_ro("_is_immutable", &ExtensionDtype<Int64Array>::IsImmutable);
 
   nb::class_<StringArray, ExtensionArray>(m, "StringArray")
       .def(nb::init<std::vector<std::optional<std::string_view>>>())
@@ -108,4 +128,14 @@ NB_MODULE(nanopandas_ext, m) {
       .def("isspace", &IsSpace)
       .def("islower", &IsLower)
       .def("isupper", &IsUpper);
+
+  nb::class_<ExtensionDtype<StringArray>>(m, "StringDtype")
+      .def("__str__", &ExtensionDtype<StringArray>::Str)
+      .def_prop_ro("na_value", &ExtensionDtype<StringArray>::NaValue)
+      .def_prop_ro("kind", &ExtensionDtype<StringArray>::Kind)
+      .def_prop_ro("name", &ExtensionDtype<StringArray>::Name)
+      .def_prop_ro("is_numeric", &ExtensionDtype<StringArray>::IsNumeric)
+      .def_prop_ro("is_boolean", &ExtensionDtype<StringArray>::IsBoolean)
+      .def_prop_ro("_can_hold_na", &ExtensionDtype<StringArray>::CanHoldNA)
+      .def_prop_ro("_is_immutable", &ExtensionDtype<StringArray>::IsImmutable);
 }

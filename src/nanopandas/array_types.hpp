@@ -22,6 +22,7 @@ public:
   using PyObjectT = nb::bool_;
   static constexpr enum ArrowType ArrowT = NANOARROW_TYPE_BOOL;
   static constexpr const char Name[20] = "BoolArray";
+  static constexpr const char ExtensionName[] = "bool[nanoarrow]";
 
   template <typename C> explicit BoolArray(const C &booleans) {
     // TODO: assert we only get bool or std::optional<bool>
@@ -80,6 +81,7 @@ public:
   using PyObjectT = nb::int_;
   static constexpr enum ArrowType ArrowT = NANOARROW_TYPE_INT64;
   static constexpr const char Name[20] = "Int64Array";
+  static constexpr const char ExtensionName[] = "int64[nanoarrow]";
 
   template <typename C> explicit Int64Array(const C &integers) {
     // TODO: assert we only get integral or std::optional<integral>
@@ -135,6 +137,7 @@ public:
   using PyObjectT = nb::str;
   static constexpr enum ArrowType ArrowT = NANOARROW_TYPE_LARGE_STRING;
   static constexpr const char Name[20] = "StringArray";
+  static constexpr const char ExtensionName[] = "string[nanoarrow]";
 
   template <typename C> explicit StringArray(const C &strings) {
     static_assert(std::is_same<typename C::value_type,
@@ -187,4 +190,45 @@ public:
                                std::string(error.message));
     }
   }
+};
+
+template <typename T> class ExtensionDtype {
+  static constexpr const char *name = T::ExtensionName;
+
+public:
+  auto Str() const -> const char * { return name; }
+
+  auto NaValue() const -> nb::object { return nb::none(); }
+
+  auto Kind() const -> const char * {
+    if constexpr (std::is_same_v<T, BoolArray>) {
+      return "b";
+    } else if constexpr (std::is_same_v<T, Int64Array>) {
+      return "i";
+    } else if constexpr (std::is_same_v<T, StringArray>) {
+      return "O";
+    }
+  }
+
+  auto Name() const -> const char * { return name; }
+
+  auto IsNumeric() const -> bool {
+    if constexpr (std::is_same_v<T, Int64Array>) {
+      return true;
+    }
+
+    return false;
+  }
+
+  auto IsBoolean() const -> bool {
+    if constexpr (std::is_same_v<T, BoolArray>) {
+      return true;
+    }
+
+    return false;
+  }
+
+  auto CanHoldNA() const -> bool { return true; }
+
+  auto IsImmutable() const -> bool { return true; }
 };
