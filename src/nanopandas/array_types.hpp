@@ -28,14 +28,14 @@ public:
   using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
 #ifdef _MSC_VER
   static constexpr GetFuncPtrT ArrowGetFunc =
-      (GetFuncPtrT)&ArrowArrayViewGetIntUnsafe;
+      (const GetFuncPtrT)&ArrowArrayViewGetIntUnsafe;
 #else
   static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetIntUnsafe;
 #endif
   using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
 #ifdef _MSC_VER
   static constexpr AppendFuncPtrT ArrowAppendFunc =
-      (AppendFuncPtrT)&ArrowArrayAppendInt;
+      (const AppendFuncPtrT)&ArrowArrayAppendInt;
 #else
   static constexpr AppendFuncPtrT ArrowAppendFunc = &ArrowArrayAppendInt;
 #endif
@@ -102,14 +102,14 @@ public:
   using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
 #ifdef _MSC_VER
   static constexpr GetFuncPtrT ArrowGetFunc =
-      (GetFuncPtrT)&ArrowArrayViewGetIntUnsafe;
+      (const GetFuncPtrT)&ArrowArrayViewGetIntUnsafe;
 #else
   static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetIntUnsafe;
 #endif
   using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
 #ifdef _MSC_VER
   static constexpr AppendFuncPtrT ArrowAppendFunc =
-      (AppendFuncPtrT)&ArrowArrayAppendInt;
+      (const AppendFuncPtrT)&ArrowArrayAppendInt;
 #else
   static constexpr AppendFuncPtrT ArrowAppendFunc = &ArrowArrayAppendInt;
 #endif
@@ -173,14 +173,14 @@ public:
   using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
 #ifdef _MSC_VER
   static constexpr GetFuncPtrT ArrowGetFunc =
-      (GetFuncPtrT)&ArrowArrayViewGetStringUnsafe;
+      (const GetFuncPtrT)&ArrowArrayViewGetStringUnsafe;
 #else
   static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetStringUnsafe;
 #endif
   using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
 #ifdef _MSC_VER
   static constexpr AppendFuncPtrT ArrowAppendFunc =
-      (AppendFuncPtrT)&ArrowArrayAppendString;
+      (const AppendFuncPtrT)&ArrowArrayAppendString;
 #else
   static constexpr AppendFuncPtrT ArrowAppendFunc = &ArrowArrayAppendString;
 #endif
