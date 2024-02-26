@@ -172,6 +172,7 @@ auto GetItemDunderInternal(const T &self, int64_t index)
 template <typename T>
 auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
 
+  // Attempt 1. - scalar
   int64_t i;
   if (nb::try_cast(indexer, i, false)) {
     if (const auto result = GetItemDunderInternal(self, i)) {
@@ -201,6 +202,7 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
     throw std::runtime_error("Could not start appending");
   }
 
+  // Attempt 2. - list of ints
   std::vector<std::optional<int64_t>> values;
   if (nb::try_cast(indexer, values, false)) {
     for (const auto idx : values) {
@@ -245,31 +247,7 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
     return nb::inst_take_ownership(py_type, out);
   }
 
-  /*
-  nb::ndarray<const int64_t, nb::ndim<1>> array;
-  if (nb::try_cast(indexer, array, false)) {
-    auto v = array.view();
-    for (size_t idx = 0; idx < v.shape(0); idx++) {
-      if (const auto value = GetItemDunderInternal(self, idx)) {
-        if constexpr (std::is_same_v<T, BoolArray>) {
-          result.append(nb::bool_(*value));
-        } else if constexpr (std::is_same_v<T, Int64Array>) {
-          result.append(nb::int_(*value));
-        } else if constexpr (std::is_same_v<T, StringArray>) {
-          result.append(nb::str(value->data(), value->size()));
-        } else {
-          // see https://stackoverflow.com/a/64354296/621736
-          static_assert(!sizeof(T), "__getitem__ not implemented for type");
-        }
-      } else {
-        result.append(nb::none());
-      }
-    }
-
-    return result;
-  }
-  */
-
+  // Attempt 3. - ndarray
   nb::ndarray<const bool, nb::ndim<1>> array;
   if (nb::try_cast(indexer, array, false)) {
     auto v = array.view();
@@ -298,6 +276,78 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
             throw std::runtime_error("failed to append null!");
           }
         }
+      }
+    }
+
+    struct ArrowError error;
+    if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+      throw std::runtime_error("Failed to finish building: " +
+                               std::string(error.message));
+    }
+
+    nb::handle py_type = nb::type<T>();
+    T *out = new T(std::move(result));
+    return nb::inst_take_ownership(py_type, out);
+  }
+
+  // Attempt 4. - slice
+  nb::slice sliceobj;
+  if (nb::try_cast(indexer, sliceobj, false)) {
+    const auto converted_slice = sliceobj.compute(self.array_view_->length);
+    const auto [start, stop, step, _] = converted_slice;
+    auto idx = start;
+
+    if (step > 0) {
+      while (idx <= stop) {
+        if (const auto value = GetItemDunderInternal(self, idx)) {
+          if constexpr (std::is_same_v<T, BoolArray> ||
+                        std::is_same_v<T, Int64Array>) {
+            if (ArrowArrayAppendInt(result.get(), *value)) {
+              throw std::runtime_error("failed to append int!");
+            }
+          } else if constexpr (std::is_same_v<T, StringArray>) {
+            const struct ArrowStringView sv {
+              value->data(), static_cast<int64_t>(value->size())
+            };
+            if (ArrowArrayAppendString(result.get(), sv)) {
+              throw std::runtime_error("failed to append string!");
+            }
+          } else {
+            // see https://stackoverflow.com/a/64354296/621736
+            static_assert(!sizeof(T), "__getitem__ not implemented for type");
+          }
+        } else {
+          if (ArrowArrayAppendNull(result.get(), 1)) {
+            throw std::runtime_error("failed to append null!");
+          }
+        }
+        idx += step;
+      }
+    } else { // negative step size
+      while (idx > stop) {
+        if (const auto value = GetItemDunderInternal(self, idx)) {
+          if constexpr (std::is_same_v<T, BoolArray> ||
+                        std::is_same_v<T, Int64Array>) {
+            if (ArrowArrayAppendInt(result.get(), *value)) {
+              throw std::runtime_error("failed to append int!");
+            }
+          } else if constexpr (std::is_same_v<T, StringArray>) {
+            const struct ArrowStringView sv {
+              value->data(), static_cast<int64_t>(value->size())
+            };
+            if (ArrowArrayAppendString(result.get(), sv)) {
+              throw std::runtime_error("failed to append string!");
+            }
+          } else {
+            // see https://stackoverflow.com/a/64354296/621736
+            static_assert(!sizeof(T), "__getitem__ not implemented for type");
+          }
+        } else {
+          if (ArrowArrayAppendNull(result.get(), 1)) {
+            throw std::runtime_error("failed to append null!");
+          }
+        }
+        idx += step;
       }
     }
 
