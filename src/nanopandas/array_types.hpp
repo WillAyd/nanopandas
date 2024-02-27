@@ -24,6 +24,12 @@ public:
   static constexpr const char Name[20] = "BoolArray";
   static constexpr const char ExtensionName[] = "bool[nanoarrow]";
 
+  using ArrowScalarT = int64_t;
+  using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
+  static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetIntUnsafe;
+  using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
+  static constexpr AppendFuncPtrT ArrowAppendFunc = &ArrowArrayAppendInt;
+
   template <typename C> explicit BoolArray(const C &booleans) {
     // TODO: assert we only get bool or std::optional<bool>
     // static_assert(std::is_integral<typename C::value_type>::value ||
@@ -83,6 +89,12 @@ public:
   static constexpr const char Name[20] = "Int64Array";
   static constexpr const char ExtensionName[] = "int64[nanoarrow]";
 
+  using ArrowScalarT = int64_t;
+  using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
+  static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetIntUnsafe;
+  using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
+  static constexpr AppendFuncPtrT ArrowAppendFunc = &ArrowArrayAppendInt;
+
   template <typename C> explicit Int64Array(const C &integers) {
     // TODO: assert we only get integral or std::optional<integral>
     // static_assert(std::is_integral<typename C::value_type>::value ||
@@ -133,11 +145,17 @@ public:
 
 class StringArray : public ExtensionArray {
 public:
-  using ScalarT = std::string_view;
+  using ScalarT = std::string_view; // C++ object to be returned
   using PyObjectT = nb::str;
   static constexpr enum ArrowType ArrowT = NANOARROW_TYPE_LARGE_STRING;
   static constexpr const char Name[20] = "StringArray";
   static constexpr const char ExtensionName[] = "string[nanoarrow]";
+
+  using ArrowScalarT = ArrowStringView;
+  using GetFuncPtrT = ArrowScalarT (*)(const struct ArrowArrayView *, int64_t);
+  static constexpr GetFuncPtrT ArrowGetFunc = &ArrowArrayViewGetStringUnsafe;
+  using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
+  static constexpr AppendFuncPtrT ArrowAppendFunc = &ArrowArrayAppendString;
 
   template <typename C> explicit StringArray(const C &strings) {
     static_assert(std::is_same<typename C::value_type,
