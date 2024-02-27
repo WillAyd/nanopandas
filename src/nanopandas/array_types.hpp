@@ -1,6 +1,5 @@
 #pragma once
 
-#include <functional>
 #include <nanoarrow/nanoarrow.hpp>
 #include <nanobind/nanobind.h>
 #include <optional>
