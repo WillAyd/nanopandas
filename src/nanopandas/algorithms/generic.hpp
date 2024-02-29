@@ -113,22 +113,9 @@ T FromFactorized([[maybe_unused]] const T &self, const Int64Array &locs,
         throw std::invalid_argument("Failed to append null!");
       }
     } else {
-      if constexpr (std::is_same_v<T, BoolArray> ||
-                    std::is_same_v<T, Int64Array>) {
-        const auto value =
-            ArrowArrayViewGetIntUnsafe(values.array_view_.get(), loc_value);
-        if (ArrowArrayAppendInt(result.get(), value)) {
-          throw std::runtime_error("failed to append int!");
-        }
-      } else if constexpr (std::is_same_v<T, StringArray>) {
-        const auto value =
-            ArrowArrayViewGetStringUnsafe(values.array_view_.get(), loc_value);
-        if (ArrowArrayAppendString(result.get(), value)) {
-          throw std::runtime_error("failed to append string!");
-        }
-      } else {
-        // see https://stackoverflow.com/a/64354296/621736
-        static_assert(!sizeof(T), "FromFactorized not implemented for type");
+      const auto value = T::ArrowGetFunc(values.array_view_.get(), loc_value);
+      if (T::ArrowAppendFunc(result.get(), value)) {
+        throw std::runtime_error("Append call failed!");
       }
     }
   }
@@ -144,7 +131,7 @@ T FromFactorized([[maybe_unused]] const T &self, const Int64Array &locs,
 
 template <typename T>
 auto GetItemDunderInternal(const T &self, int64_t index)
-    -> std::optional<typename T::ScalarT> {
+    -> std::optional<typename T::ArrowScalarT> {
   const auto n = self.array_view_.get()->length;
   if ((index >= n) || (index < -n)) {
     throw std::out_of_range("index out of bounds");
@@ -155,18 +142,7 @@ auto GetItemDunderInternal(const T &self, int64_t index)
     return std::nullopt;
   }
 
-  if constexpr (std::is_same_v<T, BoolArray> || std::is_same_v<T, Int64Array>) {
-    return ArrowArrayViewGetIntUnsafe(self.array_view_.get(), idx);
-  } else if constexpr (std::is_same_v<T, StringArray>) {
-    const auto value =
-        ArrowArrayViewGetStringUnsafe(self.array_view_.get(), idx);
-
-    return
-        typename T::ScalarT{value.data, static_cast<size_t>(value.size_bytes)};
-  } else {
-    // see https://stackoverflow.com/a/64354296/621736
-    static_assert(!sizeof(T), "__getitem__ not implemented for type");
-  }
+  return T::ArrowGetFunc(self.array_view_.get(), idx);
 }
 
 template <typename T>
@@ -180,7 +156,7 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
                     std::is_same_v<T, Int64Array>) {
         return typename T::PyObjectT(*result);
       } else if constexpr (std::is_same_v<T, StringArray>) {
-        return typename T::PyObjectT(result->data(), result->size());
+        return typename T::PyObjectT(result->data, result->size_bytes);
       } else {
         // see https://stackoverflow.com/a/64354296/621736
         static_assert(!sizeof(T), "__getitem__ not implemented for type");
@@ -208,21 +184,8 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
     for (const auto idx : values) {
       if (idx) {
         if (const auto value = GetItemDunderInternal(self, *idx)) {
-          if constexpr (std::is_same_v<T, BoolArray> ||
-                        std::is_same_v<T, Int64Array>) {
-            if (ArrowArrayAppendInt(result.get(), *value)) {
-              throw std::runtime_error("failed to append int!");
-            }
-          } else if constexpr (std::is_same_v<T, StringArray>) {
-            const struct ArrowStringView sv {
-              value->data(), static_cast<int64_t>(value->size())
-            };
-            if (ArrowArrayAppendString(result.get(), sv)) {
-              throw std::runtime_error("failed to append string!");
-            }
-          } else {
-            // see https://stackoverflow.com/a/64354296/621736
-            static_assert(!sizeof(T), "__getitem__ not implemented for type");
+          if (T::ArrowAppendFunc(result.get(), *value)) {
+            throw std::runtime_error("Append call failed!");
           }
         } else {
           if (ArrowArrayAppendNull(result.get(), 1)) {
@@ -255,21 +218,8 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
       const auto should_index = v(idx);
       if (should_index) {
         if (const auto value = GetItemDunderInternal(self, idx)) {
-          if constexpr (std::is_same_v<T, BoolArray> ||
-                        std::is_same_v<T, Int64Array>) {
-            if (ArrowArrayAppendInt(result.get(), *value)) {
-              throw std::runtime_error("failed to append int!");
-            }
-          } else if constexpr (std::is_same_v<T, StringArray>) {
-            const struct ArrowStringView sv {
-              value->data(), static_cast<int64_t>(value->size())
-            };
-            if (ArrowArrayAppendString(result.get(), sv)) {
-              throw std::runtime_error("failed to append string!");
-            }
-          } else {
-            // see https://stackoverflow.com/a/64354296/621736
-            static_assert(!sizeof(T), "__getitem__ not implemented for type");
+          if (T::ArrowAppendFunc(result.get(), *value)) {
+            throw std::runtime_error("Append call failed!");
           }
         } else {
           if (ArrowArrayAppendNull(result.get(), 1)) {
@@ -300,21 +250,8 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
     if (step > 0) {
       while (idx <= stop) {
         if (const auto value = GetItemDunderInternal(self, idx)) {
-          if constexpr (std::is_same_v<T, BoolArray> ||
-                        std::is_same_v<T, Int64Array>) {
-            if (ArrowArrayAppendInt(result.get(), *value)) {
-              throw std::runtime_error("failed to append int!");
-            }
-          } else if constexpr (std::is_same_v<T, StringArray>) {
-            const struct ArrowStringView sv {
-              value->data(), static_cast<int64_t>(value->size())
-            };
-            if (ArrowArrayAppendString(result.get(), sv)) {
-              throw std::runtime_error("failed to append string!");
-            }
-          } else {
-            // see https://stackoverflow.com/a/64354296/621736
-            static_assert(!sizeof(T), "__getitem__ not implemented for type");
+          if (T::ArrowAppendFunc(result.get(), *value)) {
+            throw std::runtime_error("Append call failed!");
           }
         } else {
           if (ArrowArrayAppendNull(result.get(), 1)) {
@@ -326,21 +263,8 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
     } else { // negative step size
       while (idx > stop) {
         if (const auto value = GetItemDunderInternal(self, idx)) {
-          if constexpr (std::is_same_v<T, BoolArray> ||
-                        std::is_same_v<T, Int64Array>) {
-            if (ArrowArrayAppendInt(result.get(), *value)) {
-              throw std::runtime_error("failed to append int!");
-            }
-          } else if constexpr (std::is_same_v<T, StringArray>) {
-            const struct ArrowStringView sv {
-              value->data(), static_cast<int64_t>(value->size())
-            };
-            if (ArrowArrayAppendString(result.get(), sv)) {
-              throw std::runtime_error("failed to append string!");
-            }
-          } else {
-            // see https://stackoverflow.com/a/64354296/621736
-            static_assert(!sizeof(T), "__getitem__ not implemented for type");
+          if (T::ArrowAppendFunc(result.get(), *value)) {
+            throw std::runtime_error("Append call failed!");
           }
         } else {
           if (ArrowArrayAppendNull(result.get(), 1)) {
@@ -579,22 +503,9 @@ T Take(const T &self, const std::vector<int64_t> &indices) {
         throw std::runtime_error("failed to append null!");
       }
     } else {
-      if constexpr (std::is_same_v<T, BoolArray> ||
-                    std::is_same_v<T, Int64Array>) {
-        const auto value =
-            ArrowArrayViewGetIntUnsafe(self.array_view_.get(), idx);
-        if (ArrowArrayAppendInt(result.get(), value)) {
-          throw std::runtime_error("failed to append int!");
-        }
-      } else if constexpr (std::is_same_v<T, StringArray>) {
-        const auto sv =
-            ArrowArrayViewGetStringUnsafe(self.array_view_.get(), idx);
-        if (ArrowArrayAppendString(result.get(), sv)) {
-          throw std::runtime_error("failed to append string!");
-        }
-      } else {
-        // see https://stackoverflow.com/a/64354296/621736
-        static_assert(!sizeof(T), "take not implemented for type");
+      const auto value = T::ArrowGetFunc(self.array_view_.get(), idx);
+      if (T::ArrowAppendFunc(result.get(), value)) {
+        throw std::runtime_error("Append call failed!");
       }
     }
   }
@@ -631,22 +542,9 @@ template <typename T> T Copy(const T &self) {
         throw std::runtime_error("failed to append null!");
       }
     } else {
-      if constexpr (std::is_same_v<T, BoolArray> ||
-                    std::is_same_v<T, Int64Array>) {
-        const auto value =
-            ArrowArrayViewGetIntUnsafe(self.array_view_.get(), idx);
-        if (ArrowArrayAppendInt(result.get(), value)) {
-          throw std::runtime_error("failed to append int!");
-        }
-      } else if constexpr (std::is_same_v<T, StringArray>) {
-        const auto sv =
-            ArrowArrayViewGetStringUnsafe(self.array_view_.get(), idx);
-        if (ArrowArrayAppendString(result.get(), sv)) {
-          throw std::runtime_error("failed to append string!");
-        }
-      } else {
-        // see https://stackoverflow.com/a/64354296/621736
-        static_assert(!sizeof(T), "copy not implemented for type");
+      const auto value = T::ArrowGetFunc(self.array_view_.get(), idx);
+      if (T::ArrowAppendFunc(result.get(), value)) {
+        throw std::runtime_error("Append call failed!");
       }
     }
   }
@@ -738,22 +636,9 @@ template <typename T> T DropNA(const T &self) {
     if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
       continue;
     } else {
-      if constexpr (std::is_same_v<T, BoolArray> ||
-                    std::is_same_v<T, Int64Array>) {
-        const auto value =
-            ArrowArrayViewGetIntUnsafe(self.array_view_.get(), idx);
-        if (ArrowArrayAppendInt(result.get(), value)) {
-          throw std::runtime_error("failed to append int!");
-        }
-      } else if constexpr (std::is_same_v<T, StringArray>) {
-        const auto value =
-            ArrowArrayViewGetStringUnsafe(self.array_view_.get(), idx);
-        if (ArrowArrayAppendString(result.get(), value)) {
-          throw std::runtime_error("failed to append string!");
-        }
-      } else {
-        // see https://stackoverflow.com/a/64354296/621736
-        static_assert(!sizeof(T), "dropna not implemented for type");
+      const auto value = T::ArrowGetFunc(self.array_view_.get(), idx);
+      if (T::ArrowAppendFunc(result.get(), value)) {
+        throw std::runtime_error("Append call failed!");
       }
     }
   }
@@ -785,7 +670,7 @@ template <typename T> T Interpolate(const T &self) {
   }
 
   bool seen_value = false;
-  typename T::ScalarT last_value_seen;
+  typename T::ArrowScalarT last_value_seen;
 
   for (int64_t idx = 0; idx < self.array_view_.get()->length; idx++) {
     if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
@@ -794,46 +679,17 @@ template <typename T> T Interpolate(const T &self) {
           throw std::runtime_error("failed to append null!");
         }
       } else {
-        if constexpr (std::is_same_v<T, BoolArray> ||
-                      std::is_same_v<T, Int64Array>) {
-          if (ArrowArrayAppendInt(result.get(), last_value_seen)) {
-            throw std::runtime_error("failed to append int value!");
-          }
-        } else if constexpr (std::is_same_v<T, StringArray>) {
-          const struct ArrowStringView sv {
-            last_value_seen.data(), static_cast<int64_t>(last_value_seen.size())
-          };
-          if (ArrowArrayAppendString(result.get(), sv)) {
-            throw std::runtime_error("failed to append string!");
-          }
-        } else {
-          // see https://stackoverflow.com/a/64354296/621736
-          static_assert(!sizeof(T), "interpolate not implemented for type");
+        if (T::ArrowAppendFunc(result.get(), last_value_seen)) {
+          throw std::runtime_error("Append call failed!");
         }
       }
     } else {
       seen_value = true;
-
-      if constexpr (std::is_same_v<T, BoolArray> ||
-                    std::is_same_v<T, Int64Array>) {
-        const auto value =
-            ArrowArrayViewGetIntUnsafe(self.array_view_.get(), idx);
-        if (ArrowArrayAppendInt(result.get(), value)) {
-          throw std::runtime_error("failed to append int!");
-        }
-        last_value_seen = value;
-      } else if constexpr (std::is_same_v<T, StringArray>) {
-        const auto value =
-            ArrowArrayViewGetStringUnsafe(self.array_view_.get(), idx);
-        if (ArrowArrayAppendString(result.get(), value)) {
-          throw std::runtime_error("failed to append string!");
-        }
-        last_value_seen =
-            std::string_view{value.data, static_cast<size_t>(value.size_bytes)};
-      } else {
-        // see https://stackoverflow.com/a/64354296/621736
-        static_assert(!sizeof(T), "interpolate not implemented for type");
+      const auto value = T::ArrowGetFunc(self.array_view_.get(), idx);
+      if (T::ArrowAppendFunc(result.get(), value)) {
+        throw std::runtime_error("Append call failed!");
       }
+      last_value_seen = value;
     }
   }
 
@@ -868,7 +724,7 @@ template <typename T> T PadOrBackfill(const T &self, std::string_view method) {
 
   if (method == "pad") {
     bool seen_value = false;
-    typename T::ScalarT last_value_seen;
+    typename T::ArrowScalarT last_value_seen;
     for (int64_t idx = 0; idx < self.array_view_.get()->length; idx++) {
       if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
         if (!seen_value) {
@@ -876,47 +732,17 @@ template <typename T> T PadOrBackfill(const T &self, std::string_view method) {
             throw std::runtime_error("failed to append null!");
           }
         } else {
-          if constexpr (std::is_same_v<T, BoolArray> ||
-                        std::is_same_v<T, Int64Array>) {
-            if (ArrowArrayAppendInt(result.get(), last_value_seen)) {
-              throw std::runtime_error("failed to append int value!");
-            }
-          } else if constexpr (std::is_same_v<T, StringArray>) {
-            const struct ArrowStringView sv {
-              last_value_seen.data(),
-                  static_cast<int64_t>(last_value_seen.size())
-            };
-            if (ArrowArrayAppendString(result.get(), sv)) {
-              throw std::runtime_error("failed to append string!");
-            }
-          } else {
-            // see https://stackoverflow.com/a/64354296/621736
-            static_assert(!sizeof(T), "interpolate not implemented for type");
+          if (T::ArrowAppendFunc(result.get(), last_value_seen)) {
+            throw std::runtime_error("Append call failed!");
           }
         }
       } else {
         seen_value = true;
-
-        if constexpr (std::is_same_v<T, BoolArray> ||
-                      std::is_same_v<T, Int64Array>) {
-          const auto value =
-              ArrowArrayViewGetIntUnsafe(self.array_view_.get(), idx);
-          if (ArrowArrayAppendInt(result.get(), value)) {
-            throw std::runtime_error("failed to append int!");
-          }
-          last_value_seen = value;
-        } else if constexpr (std::is_same_v<T, StringArray>) {
-          const auto value =
-              ArrowArrayViewGetStringUnsafe(self.array_view_.get(), idx);
-          if (ArrowArrayAppendString(result.get(), value)) {
-            throw std::runtime_error("failed to append string!");
-          }
-          last_value_seen = std::string_view{
-              value.data, static_cast<size_t>(value.size_bytes)};
-        } else {
-          // see https://stackoverflow.com/a/64354296/621736
-          static_assert(!sizeof(T), "interpolate not implemented for type");
+        const auto value = T::ArrowGetFunc(self.array_view_.get(), idx);
+        if (T::ArrowAppendFunc(result.get(), value)) {
+          throw std::runtime_error("Append call failed!");
         }
+        last_value_seen = value;
       }
     }
   } else {
@@ -934,29 +760,13 @@ template <typename T> T PadOrBackfill(const T &self, std::string_view method) {
         }
         continue;
       } else {
-        if constexpr (std::is_same_v<T, BoolArray> ||
-                      std::is_same_v<T, Int64Array>) {
-          const auto value =
-              ArrowArrayViewGetIntUnsafe(self.array_view_.get(), idx);
-          do {
-            if (ArrowArrayAppendInt(result.get(), value)) {
-              throw std::runtime_error("failed to append int!");
-            }
-            last_append++;
-          } while (last_append <= idx);
-        } else if constexpr (std::is_same_v<T, StringArray>) {
-          const auto value =
-              ArrowArrayViewGetStringUnsafe(self.array_view_.get(), idx);
-          do {
-            if (ArrowArrayAppendString(result.get(), value)) {
-              throw std::runtime_error("failed to append string!");
-            }
-            last_append++;
-          } while (last_append <= idx);
-        } else {
-          // see https://stackoverflow.com/a/64354296/621736
-          static_assert(!sizeof(T), "PadOrBackfill not implemented for type");
-        }
+        const auto value = T::ArrowGetFunc(self.array_view_.get(), idx);
+        do {
+          if (T::ArrowAppendFunc(result.get(), value)) {
+            throw std::runtime_error("Append call failed!");
+          }
+          last_append++;
+        } while (last_append <= idx);
       }
     }
   }
@@ -1006,6 +816,7 @@ template <typename T> T Unique(const T &self) {
     throw std::runtime_error("Unable to reserve array!");
   }
 
+  // TODO: can make generic if we hash ArrowString
   for (const auto &val : uniques) {
     if constexpr (std::is_same_v<T, BoolArray> ||
                   std::is_same_v<T, Int64Array>) {
@@ -1063,6 +874,8 @@ template <typename T> std::tuple<Int64Array, T> Factorize(const T &self) {
     } else {
       const auto current_size = static_cast<int64_t>(first_occurances.size());
 
+      // TODO: we can make this generic and combine branches if we defined a
+      // hashing and comparison operator for the ArrowString types
       if constexpr (std::is_same_v<T, BoolArray> ||
                     std::is_same_v<T, Int64Array>) {
         const auto value =
