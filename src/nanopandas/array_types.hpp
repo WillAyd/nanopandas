@@ -157,6 +157,48 @@ public:
   using AppendFuncPtrT = ArrowErrorCode (*)(struct ArrowArray *, ArrowScalarT);
   static constexpr AppendFuncPtrT ArrowAppendFunc = &ArrowArrayAppendString;
 
+  // forward declare iterator for now
+  class StringArrayIterator {
+  public:
+    using value_type = std::string_view;
+    using reference = const std::string_view;
+
+    explicit StringArrayIterator(const StringArray &array, int64_t index = 0)
+        : array_(array), current_index_(index) {}
+
+    StringArrayIterator operator++() {
+      current_index_++;
+      return *this;
+    }
+
+    typename std::string_view operator*() const {
+      struct ArrowStringView sv = ArrowArrayViewGetStringUnsafe(
+          array_.array_view_.get(), current_index_);
+      return std::string_view{sv.data, static_cast<size_t>(sv.size_bytes)};
+    }
+
+    bool operator==(const StringArrayIterator &b) {
+      return (array_.array_view_.get() == b.array_.array_view_.get()) &&
+             (current_index_ == b.current_index_);
+    }
+
+    bool operator!=(const StringArrayIterator &b) {
+      return (array_.array_view_.get() != b.array_.array_view_.get()) ||
+             (current_index_ != b.current_index_);
+    }
+
+  private:
+    const StringArray &array_;
+    std::string_view current_value_;
+    int64_t current_index_;
+  };
+
+  StringArrayIterator begin() const { return StringArrayIterator(*this, 0); }
+
+  StringArrayIterator end() const {
+    return StringArrayIterator(*this, array_view_->length);
+  }
+
   template <typename C> explicit StringArray(const C &strings) {
     static_assert(std::is_same<typename C::value_type,
                                std::optional<std::string>>::value ||

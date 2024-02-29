@@ -1,5 +1,6 @@
 #include "algorithms.hpp"
 #include "array_types.hpp"
+#include <nanobind/make_iterator.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
@@ -141,6 +142,11 @@ NB_MODULE(nanopandas_ext, m) {
       .def("_from_scalars", &NoOp)
       .def("_from_sequence_of_strings", &NoOp)
       .def("__setitem__", &NoOp)
+      .def("__iter__",
+           [](const StringArray &arr) {
+             return nb::make_iterator(nb::type<StringArray>(), "iterator",
+                                      arr.begin(), arr.end());
+           })
       .def("__contains__", &NoOp)
       .def("to_numpy", &NoOp)
       .def("astype", &NoOp)
