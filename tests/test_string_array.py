@@ -1,12 +1,13 @@
 import pytest
 
 import nanopandas as nanopd
+import numpy as np
 
 
 def test_from_sequence():
     # TODO: this is not really a classmethod
     # See https://github.com/wjakob/nanobind/discussions/416
-    arr = nanopd.StringArray([])._from_sequence(("foo", None, "bar", "baz"))
+    arr = nanopd.StringArray([])._from_sequence(("foo", None, "bar", "baz"), "unused", True)
     assert arr[0] == "foo"
     assert arr[1] is None
     assert arr[2] == "bar"
@@ -17,7 +18,7 @@ def test_from_factorized():
     # TODO: this is not really a classmethod
     # See https://github.com/wjakob/nanobind/discussions/416
     base_arr = nanopd.StringArray(["foo", "bar"])
-    locs_arr = nanopd.Int64Array([0, -1, 1, 0, -1])
+    locs_arr = np.array([0, -1, 1, 0, -1], dtype=np.int64)
     result = nanopd.StringArray([])._from_factorized(locs_arr, base_arr)
 
     assert result.tolist() == ["foo", None, "bar", "foo", None]
@@ -101,7 +102,7 @@ def test_take_fill_value():
 def test_take_fill_value_none_raises():
     arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
     # not the best error, but an error for now
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ValueError):
         result = arr.take([0, 1, -1, 0], True, None)
 
 
