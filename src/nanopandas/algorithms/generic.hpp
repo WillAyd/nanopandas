@@ -427,6 +427,8 @@ template <typename T> int64_t Size(const T &self) {
   return self.array_view_->length;
 }
 
+template <typename T> int64_t NDim([[maybe_unused]] const T &self) { return 1; }
+
 template <typename T> bool Any(const T &self) {
   return self.array_view_->length > self.array_view_->null_count;
 }

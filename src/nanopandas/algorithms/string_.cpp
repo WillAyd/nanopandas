@@ -288,3 +288,5 @@ BoolArray IsUpper(const StringArray &self) {
 
   return ApplyUtf8ProcFunction(self.array_view_.get(), lambda);
 }
+
+void NoOp([[maybe_unused]] const StringArray &self) { return; }

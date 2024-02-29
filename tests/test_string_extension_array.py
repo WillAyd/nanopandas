@@ -7,10 +7,6 @@ from pandas.tests.extension import base
 import nanopandas as nanopd
 
 
-# Could not actually inherit from ExtensionDtype - probably a nanobind limitation
-# RuntimeError: nb_type_init(): invalid number of bases!
-
-
 class NanoStringDtype(ExtensionDtype):
 
     @property

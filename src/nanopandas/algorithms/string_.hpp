@@ -69,3 +69,5 @@ template <typename T> Int64Array Len(const T &self) {
 
   return Int64Array(std::move(result));
 }
+
+void NoOp(const StringArray &self);
