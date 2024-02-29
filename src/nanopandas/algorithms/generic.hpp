@@ -478,7 +478,8 @@ template <typename T> BoolArray IsNA(const T &self) {
 }
 
 template <typename T>
-T Take(const T &self, const std::vector<int64_t> &indices) {
+T Take(const T &self, const std::vector<int64_t> &indices, bool allow_fill,
+       nb::object fill_value) {
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
     throw std::runtime_error("Unable to init output array for take!");
@@ -499,15 +500,44 @@ T Take(const T &self, const std::vector<int64_t> &indices) {
       throw std::range_error("index out of bounds!");
     }
 
-    const auto idx = index >= 0 ? index : n + index;
-    if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
-      if (ArrowArrayAppendNull(result.get(), 1)) {
-        throw std::runtime_error("failed to append null!");
+    if (allow_fill) { // negative values are missing values
+      if (index < 0) {
+        auto filler = nb::cast<typename T::ScalarT>(fill_value);
+        if constexpr (std::is_same_v<T, StringArray>) {
+          struct ArrowStringView sv {
+            filler.data(), static_cast<int64_t>(filler.size())
+          };
+          if (T::ArrowAppendFunc(result.get(), sv)) {
+            throw std::runtime_error("Append call failed!");
+          }
+        } else {
+          if (T::ArrowAppendFunc(result.get(), filler)) {
+            throw std::runtime_error("Append call failed!");
+          }
+        }
+      } else { // has value - no fill needed
+        if (ArrowArrayViewIsNull(self.array_view_.get(), index)) {
+          if (ArrowArrayAppendNull(result.get(), 1)) {
+            throw std::runtime_error("failed to append null!");
+          }
+        } else {
+          const auto value = T::ArrowGetFunc(self.array_view_.get(), index);
+          if (T::ArrowAppendFunc(result.get(), value)) {
+            throw std::runtime_error("Append call failed!");
+          }
+        }
       }
-    } else {
-      const auto value = T::ArrowGetFunc(self.array_view_.get(), idx);
-      if (T::ArrowAppendFunc(result.get(), value)) {
-        throw std::runtime_error("Append call failed!");
+    } else { // negative values are wraparound indexes
+      const auto idx = index >= 0 ? index : n + index;
+      if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
+        if (ArrowArrayAppendNull(result.get(), 1)) {
+          throw std::runtime_error("failed to append null!");
+        }
+      } else {
+        const auto value = T::ArrowGetFunc(self.array_view_.get(), idx);
+        if (T::ArrowAppendFunc(result.get(), value)) {
+          throw std::runtime_error("Append call failed!");
+        }
       }
     }
   }

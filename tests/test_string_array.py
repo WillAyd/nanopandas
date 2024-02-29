@@ -88,14 +88,21 @@ def test_isna_no_data():
 
 def test_take():
     arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
-    result = arr.take([0, 1, 1, 0])
-    assert result.tolist() == ["foo", None, None, "foo"]
+    result = arr.take([0, 1, -1, 0], False, None)
+    assert result.tolist() == ["foo", None, "baz", "foo"]
 
 
-def test_negative_take():
+def test_take_fill_value():
     arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
-    result = arr.take([0, -1, -1, 0])
-    assert result.tolist() == ["foo", "baz", "baz", "foo"]
+    result = arr.take([0, 1, -1, 0], True, "filled")
+    assert result.tolist() == ["foo", None, "filled", "foo"]
+
+
+def test_take_fill_value_none_raises():
+    arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
+    # not the best error, but an error for now
+    with pytest.raises(RuntimeError):
+        result = arr.take([0, 1, -1, 0], True, None)
 
 
 def test_copy():

@@ -29,7 +29,8 @@ NB_MODULE(nanopandas_ext, m) {
       .def("__getitem__", &GetItemDunder<BoolArray>)
       .def("__eq__", &EqDunder<BoolArray>)
       .def("isna", &IsNA<BoolArray>)
-      .def("take", &Take<BoolArray>)
+      .def("take", &Take<BoolArray>, nb::arg("indices"), nb::arg("allow_fill"),
+           nb::arg("fill_value").none())
       .def("copy", &Copy<BoolArray>)
       .def("fillna", &FillNA<BoolArray>)
       .def("dropna", &DropNA<BoolArray>)
@@ -66,7 +67,8 @@ NB_MODULE(nanopandas_ext, m) {
       .def("__getitem__", &GetItemDunder<Int64Array>)
       .def("__eq__", &EqDunder<Int64Array>)
       .def("isna", &IsNA<Int64Array>)
-      .def("take", &Take<Int64Array>)
+      .def("take", &Take<Int64Array>, nb::arg("indices"), nb::arg("allow_fill"),
+           nb::arg("fill_value").none())
       .def("copy", &Copy<Int64Array>)
       .def("fillna", &FillNA<Int64Array>)
       .def("dropna", &DropNA<Int64Array>)
@@ -108,7 +110,8 @@ NB_MODULE(nanopandas_ext, m) {
       .def("__getitem__", &GetItemDunder<StringArray>)
       .def("__eq__", &EqDunder<StringArray>)
       .def("isna", &IsNA<StringArray>)
-      .def("take", &Take<StringArray>)
+      .def("take", &Take<StringArray>, nb::arg("indices"),
+           nb::arg("allow_fill"), nb::arg("fill_value").none())
       .def("copy", &Copy<StringArray>)
       .def("fillna", &FillNA<StringArray>)
       .def("dropna", &DropNA<StringArray>)
