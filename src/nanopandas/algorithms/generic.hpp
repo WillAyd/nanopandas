@@ -5,10 +5,12 @@
 #include <optional>
 #include <set>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include <nanoarrow/nanoarrow.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
 #include <utf8proc.h>
@@ -43,7 +45,12 @@ static int InvertInplace(uint8_t *buf, size_t nbytes) {
 }
 
 template <typename T>
-T FromSequence([[maybe_unused]] const T &self, nb::sequence sequence) {
+T FromSequence([[maybe_unused]] const T &self, nb::sequence sequence,
+               [[maybe_unused]] nb::object dtype, bool copy) {
+  if (!copy) {
+    throw std::invalid_argument("FromSequence requires a copy");
+  }
+
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
     throw std::runtime_error("Unable to init output array for FromSequence!");
@@ -88,14 +95,15 @@ T FromSequence([[maybe_unused]] const T &self, nb::sequence sequence) {
   return T(std::move(result));
 }
 
+/*
 template <typename T>
-T FromFactorized([[maybe_unused]] const T &self, const Int64Array &locs,
-                 const T &values) {
+T FromFactorized([[maybe_unused]] const T &self, const Int64Array &values,
+                 const T &original) {
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
     throw std::runtime_error("Unable to init output array for FromFactorized!");
   }
-  const auto n = locs.array_view_->length;
+  const auto n = values.array_view_->length;
 
   if (ArrowArrayStartAppending(result.get())) {
     throw std::runtime_error("Could not append!");
@@ -107,13 +115,56 @@ T FromFactorized([[maybe_unused]] const T &self, const Int64Array &locs,
 
   for (int64_t idx = 0; idx < n; idx++) {
     const auto loc_value =
-        ArrowArrayViewGetIntUnsafe(locs.array_view_.get(), idx);
+        ArrowArrayViewGetIntUnsafe(values.array_view_.get(), idx);
     if (loc_value == -1) {
       if (ArrowArrayAppendNull(result.get(), 1)) {
         throw std::invalid_argument("Failed to append null!");
       }
     } else {
-      const auto value = T::ArrowGetFunc(values.array_view_.get(), loc_value);
+      const auto value = T::ArrowGetFunc(original.array_view_.get(), loc_value);
+      if (T::ArrowAppendFunc(result.get(), value)) {
+        throw std::runtime_error("Append call failed!");
+      }
+    }
+  }
+
+  struct ArrowError error;
+  if (ArrowArrayFinishBuildingDefault(result.get(), &error)) {
+    throw std::runtime_error("Failed to finish building: " +
+                             std::string(error.message));
+  }
+
+  return T(std::move(result));
+}
+*/
+
+template <typename T>
+T FromFactorized([[maybe_unused]] const T &self,
+                 const nb::ndarray<const int64_t, nb::ndim<1>> &values,
+                 const T &original) {
+  nanoarrow::UniqueArray result;
+  if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
+    throw std::runtime_error("Unable to init output array for FromFactorized!");
+  }
+  const auto n = values.size();
+
+  if (ArrowArrayStartAppending(result.get())) {
+    throw std::runtime_error("Could not append!");
+  }
+
+  if (ArrowArrayReserve(result.get(), n)) {
+    throw std::runtime_error("Unable to reserve array!");
+  }
+
+  auto values_v = values.view();
+  for (size_t idx = 0; idx < n; idx++) {
+    const auto loc_value = values_v(idx);
+    if (loc_value == -1) {
+      if (ArrowArrayAppendNull(result.get(), 1)) {
+        throw std::invalid_argument("Failed to append null!");
+      }
+    } else {
+      const auto value = T::ArrowGetFunc(original.array_view_.get(), loc_value);
       if (T::ArrowAppendFunc(result.get(), value)) {
         throw std::runtime_error("Append call failed!");
       }
@@ -248,7 +299,7 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
     auto idx = start;
 
     if (step > 0) {
-      while (idx <= stop) {
+      while (idx < stop) {
         if (const auto value = GetItemDunderInternal(self, idx)) {
           if (T::ArrowAppendFunc(result.get(), *value)) {
             throw std::runtime_error("Append call failed!");
@@ -427,6 +478,8 @@ template <typename T> int64_t Size(const T &self) {
   return self.array_view_->length;
 }
 
+template <typename T> int64_t NDim([[maybe_unused]] const T &self) { return 1; }
+
 template <typename T> bool Any(const T &self) {
   return self.array_view_->length > self.array_view_->null_count;
 }
@@ -476,7 +529,8 @@ template <typename T> BoolArray IsNA(const T &self) {
 }
 
 template <typename T>
-T Take(const T &self, const std::vector<int64_t> &indices) {
+T Take(const T &self, const std::vector<int64_t> &indices,
+       bool allow_fill = false, nb::object fill_value = nb::none()) {
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
     throw std::runtime_error("Unable to init output array for take!");
@@ -494,18 +548,61 @@ T Take(const T &self, const std::vector<int64_t> &indices) {
 
   for (const auto index : indices) {
     if ((index >= n) || (index < -n)) {
-      throw std::range_error("index out of bounds!");
+      // special case for empty arrays
+      if (n == 0) {
+        if ((index >= 0) || !allow_fill) {
+          throw std::out_of_range(
+              "cannot do a non-empty take from an empty axes");
+        }
+      } else {
+        throw std::out_of_range("index out of bounds!");
+      }
     }
 
-    const auto idx = index >= 0 ? index : n + index;
-    if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
-      if (ArrowArrayAppendNull(result.get(), 1)) {
-        throw std::runtime_error("failed to append null!");
+    if (allow_fill) { // negative values are missing values
+      if (index < 0) {
+        if (fill_value.is_none()) {
+          if (ArrowArrayAppendNull(result.get(), 1)) {
+            throw std::runtime_error("failed to append null!");
+          }
+        } else {
+          auto filler = nb::cast<typename T::ScalarT>(fill_value);
+          if constexpr (std::is_same_v<T, StringArray>) {
+            struct ArrowStringView sv {
+              filler.data(), static_cast<int64_t>(filler.size())
+            };
+            if (T::ArrowAppendFunc(result.get(), sv)) {
+              throw std::runtime_error("Append call failed!");
+            }
+          } else {
+            if (T::ArrowAppendFunc(result.get(), filler)) {
+              throw std::runtime_error("Append call failed!");
+            }
+          }
+        }
+      } else { // has value - no fill needed
+        if (ArrowArrayViewIsNull(self.array_view_.get(), index)) {
+          if (ArrowArrayAppendNull(result.get(), 1)) {
+            throw std::runtime_error("failed to append null!");
+          }
+        } else {
+          const auto value = T::ArrowGetFunc(self.array_view_.get(), index);
+          if (T::ArrowAppendFunc(result.get(), value)) {
+            throw std::runtime_error("Append call failed!");
+          }
+        }
       }
-    } else {
-      const auto value = T::ArrowGetFunc(self.array_view_.get(), idx);
-      if (T::ArrowAppendFunc(result.get(), value)) {
-        throw std::runtime_error("Append call failed!");
+    } else { // negative values are wraparound indexes
+      const auto idx = index >= 0 ? index : n + index;
+      if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
+        if (ArrowArrayAppendNull(result.get(), 1)) {
+          throw std::runtime_error("failed to append null!");
+        }
+      } else {
+        const auto value = T::ArrowGetFunc(self.array_view_.get(), idx);
+        if (T::ArrowAppendFunc(result.get(), value)) {
+          throw std::runtime_error("Append call failed!");
+        }
       }
     }
   }
@@ -845,6 +942,7 @@ template <typename T> T Unique(const T &self) {
   return T(std::move(result));
 }
 
+/*
 template <typename T> std::tuple<Int64Array, T> Factorize(const T &self) {
   std::unordered_map<typename T::ScalarT, int64_t> first_occurances;
 
@@ -932,6 +1030,108 @@ template <typename T> std::tuple<Int64Array, T> Factorize(const T &self) {
   }
 
   return std::make_tuple(Int64Array{std::move(locs)}, T{std::move(values)});
+}
+*/
+
+template <typename T>
+std::tuple<nb::ndarray<nb::numpy, const int64_t, nb::shape<1>>, T>
+Factorize(const T &self) {
+  std::unordered_map<typename T::ScalarT, int64_t> first_occurances;
+
+  nanoarrow::UniqueArray values;
+  if (ArrowArrayInitFromType(values.get(), T::ArrowT)) {
+    throw std::runtime_error("Unable to init array for values!");
+  }
+  nanoarrow::UniqueArray locs;
+  if (ArrowArrayInitFromType(locs.get(), NANOARROW_TYPE_INT64)) {
+    throw std::runtime_error("Unable to init int64 array!");
+  }
+  const auto n = self.array_view_->length;
+
+  if (ArrowArrayStartAppending(values.get())) {
+    throw std::runtime_error("Could not start appending");
+  }
+
+  if (ArrowArrayStartAppending(locs.get())) {
+    throw std::runtime_error("Could not start appending");
+  }
+
+  for (int64_t idx = 0; idx < n; idx++) {
+    if (ArrowArrayViewIsNull(self.array_view_.get(), idx)) {
+      if (ArrowArrayAppendInt(locs.get(), -1)) {
+        throw std::runtime_error("failed to append int!");
+      }
+    } else {
+      const auto current_size = static_cast<int64_t>(first_occurances.size());
+
+      // TODO: we can make this generic and combine branches if we defined a
+      // hashing and comparison operator for the ArrowString types
+      if constexpr (std::is_same_v<T, BoolArray> ||
+                    std::is_same_v<T, Int64Array>) {
+        const auto value =
+            ArrowArrayViewGetIntUnsafe(self.array_view_.get(), idx);
+        auto did_insert = first_occurances.try_emplace(value, current_size);
+        if (did_insert.second) {
+          if (ArrowArrayAppendInt(locs.get(), current_size)) {
+            throw std::runtime_error("failed to append int!");
+          }
+          if (ArrowArrayAppendInt(values.get(), value)) {
+            throw std::runtime_error("failed to append string");
+          }
+        } else {
+          const int64_t existing_loc = did_insert.first->second;
+          if (ArrowArrayAppendInt(locs.get(), existing_loc)) {
+            throw std::runtime_error("failed to append int!");
+          }
+        }
+      } else if constexpr (std::is_same_v<T, StringArray>) {
+        const auto sv =
+            ArrowArrayViewGetStringUnsafe(self.array_view_.get(), idx);
+        const std::string_view value{sv.data,
+                                     static_cast<size_t>(sv.size_bytes)};
+
+        auto did_insert = first_occurances.try_emplace(value, current_size);
+        if (did_insert.second) {
+          if (ArrowArrayAppendInt(locs.get(), current_size)) {
+            throw std::runtime_error("failed to append int!");
+          }
+          if (ArrowArrayAppendString(values.get(), sv)) {
+            throw std::runtime_error("failed to append string");
+          }
+        } else {
+          const int64_t existing_loc = did_insert.first->second;
+          if (ArrowArrayAppendInt(locs.get(), existing_loc)) {
+            throw std::runtime_error("failed to append int!");
+          }
+        }
+      } else {
+        // see https://stackoverflow.com/a/64354296/621736
+        static_assert(!sizeof(T), "Factorize not implemented for type");
+      }
+    }
+  }
+
+  struct ArrowError error;
+  if (ArrowArrayFinishBuildingDefault(values.get(), &error)) {
+    throw std::runtime_error("Failed to finish building: " +
+                             std::string(error.message));
+  }
+  if (ArrowArrayFinishBuildingDefault(locs.get(), &error)) {
+    throw std::runtime_error("Failed to finish building: " +
+                             std::string(error.message));
+  }
+
+  size_t shape[1] = {static_cast<size_t>(locs.get()->length)};
+  auto outarr = nb::ndarray<nb::numpy, const int64_t, nb::shape<1>>(
+      locs.get()->buffers[1], 1, shape);
+
+  // TODO: This is really hacky
+  // must be a better way to transfer ownership to the ndarray
+  struct ArrowBuffer *data_buffer = ArrowArrayBuffer(locs.get(), 1);
+  struct ArrowBuffer release_dummy;
+  ArrowBufferMove(data_buffer, &release_dummy);
+
+  return std::make_tuple(outarr, T{std::move(values)});
 }
 
 template <typename T>
@@ -1039,3 +1239,9 @@ BoolArray ConcatSameType(const BoolArray &self, const BoolArray &other);
 
 template <>
 StringArray ConcatSameType(const StringArray &self, const StringArray &other);
+
+template <typename T>
+auto Reshape([[maybe_unused]] const T &self, [[maybe_unused]] nb::object shape)
+    -> nb::object {
+  return nb::not_implemented();
+}

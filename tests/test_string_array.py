@@ -1,12 +1,13 @@
 import pytest
 
 import nanopandas as nanopd
+import numpy as np
 
 
 def test_from_sequence():
     # TODO: this is not really a classmethod
     # See https://github.com/wjakob/nanobind/discussions/416
-    arr = nanopd.StringArray([])._from_sequence(("foo", None, "bar", "baz"))
+    arr = nanopd.StringArray([])._from_sequence(("foo", None, "bar", "baz"), "unused", True)
     assert arr[0] == "foo"
     assert arr[1] is None
     assert arr[2] == "bar"
@@ -17,10 +18,10 @@ def test_from_factorized():
     # TODO: this is not really a classmethod
     # See https://github.com/wjakob/nanobind/discussions/416
     base_arr = nanopd.StringArray(["foo", "bar"])
-    locs_arr = nanopd.Int64Array([0, -1, 1, 0, -1])
+    locs_arr = np.array([0, -1, 1, 0, -1], dtype=np.int64)
     result = nanopd.StringArray([])._from_factorized(locs_arr, base_arr)
 
-    assert result.to_pylist() == ["foo", None, "bar", "foo", None]
+    assert result.tolist() == ["foo", None, "bar", "foo", None]
 
 
 def test_getitem():
@@ -57,7 +58,7 @@ def test_eq():
     arr = nanopd.StringArray(["foo", None, "foo", "üàéµ", "üàéµ"])
     other = nanopd.StringArray(["foo", None, "42", "üàéµ", "üàéµ"])
     result = arr == other
-    assert result.to_pylist() == [True, None, False, True, True]
+    assert result.tolist() == [True, None, False, True, True]
 
 
 def test_nbytes():
@@ -73,35 +74,42 @@ def test_shape():
 def test_isna():
     arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
     result = arr.isna()
-    assert result.to_pylist() == [False, True, False, True, False]
+    assert result.tolist() == [False, True, False, True, False]
 
 def test_isna_no_missing():
     arr = nanopd.StringArray(["foo", "bar", "baz"])
     result = arr.isna()
-    assert result.to_pylist() == [False, False, False]
+    assert result.tolist() == [False, False, False]
 
 def test_isna_no_data():
     arr = nanopd.StringArray([])
     result = arr.isna()
-    assert result.to_pylist() == []
+    assert result.tolist() == []
 
 
 def test_take():
     arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
-    result = arr.take([0, 1, 1, 0])
-    assert result.to_pylist() == ["foo", None, None, "foo"]
+    result = arr.take([0, 1, -1, 0], False, None)
+    assert result.tolist() == ["foo", None, "baz", "foo"]
 
 
-def test_negative_take():
+def test_take_fill_value():
     arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
-    result = arr.take([0, -1, -1, 0])
-    assert result.to_pylist() == ["foo", "baz", "baz", "foo"]
+    result = arr.take([0, 1, -1, 0], True, "filled")
+    assert result.tolist() == ["foo", None, "filled", "foo"]
+
+
+def test_take_fill_value_none_raises():
+    arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
+    # not the best error, but an error for now
+    with pytest.raises(ValueError):
+        result = arr.take([0, 1, -1, 0], True, None)
 
 
 def test_copy():
     arr = nanopd.StringArray(["foo", None, "bar", None, "baz"])
     result = arr.copy()
-    assert arr.to_pylist() == result.to_pylist()
+    assert arr.tolist() == result.tolist()
 
 
 def test_concat_same_type():
@@ -110,14 +118,14 @@ def test_concat_same_type():
     result = arr._concat_same_type(other)
 
     expected = ["foo", None, "bar", None, "baz", None, "quz", None, "quux"]
-    assert result.to_pylist() == expected
+    assert result.tolist() == expected
 
 
 def test_interpolate():
     arr = nanopd.StringArray([None, "foo", None, "bar", None, "baz"])
     result = arr.interpolate()
     expected = [None, "foo", "foo", "bar", "bar", "baz"]
-    assert result.to_pylist() == expected
+    assert result.tolist() == expected
 
 
 def test_repr():
@@ -144,28 +152,28 @@ def test_fillna():
     arr = nanopd.StringArray([None, "foo", None, "bar", None, "baz"])
     result = arr.fillna("filled")
     expected = ["filled", "foo", "filled", "bar", "filled", "baz"]
-    assert result.to_pylist() == expected
+    assert result.tolist() == expected
 
 
 def test_pad_or_backfill_pad():
     arr = nanopd.StringArray([None, "foo", None, None, "baz", None])
     result = arr._pad_or_backfill("pad")
     expected = [None, "foo", "foo", "foo", "baz", "baz"]
-    assert result.to_pylist() == expected
+    assert result.tolist() == expected
 
 
 def test_pad_or_backfill_backfill():
     arr = nanopd.StringArray([None, "foo", None, None, "baz", None])
     result = arr._pad_or_backfill("backfill")
     expected = ["foo", "foo", "baz", "baz", "baz", None]
-    assert result.to_pylist() == expected
+    assert result.tolist() == expected
 
 
 def test_dropna():
     arr = nanopd.StringArray([None, "foo", None, "bar", None, "baz"])
     result = arr.dropna()
     expected = ["foo", "bar", "baz"]
-    assert result.to_pylist() == expected
+    assert result.tolist() == expected
 
 
 def test_unique():
@@ -182,69 +190,69 @@ def test_factorize():
     arr = nanopd.StringArray(["foo", None, "foo", "üàéµ", "üàéµ"])
     locs, uniqs = arr.factorize()
 
-    assert locs.to_pylist() == [0, -1, 0, 1, 1]
-    assert uniqs.to_pylist() == ["foo", "üàéµ"]
+    assert locs.tolist() == [0, -1, 0, 1, 1]
+    assert uniqs.tolist() == ["foo", "üàéµ"]
 
 
 # str accessor methods
 def test_len():
     arr = nanopd.StringArray(["foo", None, "bar", "üàéµ", "baz"])
     result = arr.len()
-    assert result.to_pylist() == [3, None, 3, 4, 3]
+    assert result.tolist() == [3, None, 3, 4, 3]
 
 
 def test_lower():
     arr = nanopd.StringArray(["FOO", None, "BAR", "ÜÀÉΜ", "baz"])
     result = arr.lower()
-    assert result.to_pylist() == ["foo", None, "bar", "üàéμ", "baz"]
+    assert result.tolist() == ["foo", None, "bar", "üàéμ", "baz"]
 
 
 def test_upper():
     arr = nanopd.StringArray(["foo", None, "bar", "üàéµ", "BAZ"])
     result = arr.upper()
-    assert result.to_pylist() == ["FOO", None, "BAR", "ÜÀÉΜ", "BAZ"]
+    assert result.tolist() == ["FOO", None, "BAR", "ÜÀÉΜ", "BAZ"]
 
 
 def test_capitalize():
     arr = nanopd.StringArray(["foo", None, "bar", "üàéµ", "BAZ"])
     result = arr.capitalize()
-    assert result.to_pylist() == ["Foo", None, "Bar", "Üàéµ", "BAZ"]
+    assert result.tolist() == ["Foo", None, "Bar", "Üàéµ", "BAZ"]
 
 
 def test_isalnum():
     arr = nanopd.StringArray(["foo", None, "üàéµ", "bar!!", "42", " "])
     result = arr.isalnum()
-    assert result.to_pylist() == [True, None, True, False, True, False]
+    assert result.tolist() == [True, None, True, False, True, False]
 
 
 def test_isalpha():
     arr = nanopd.StringArray(["foo", None, "üàéµ", "bar!!", "42", " "])
     result = arr.isalpha()
-    assert result.to_pylist() == [True, None, True, False, False, False]
+    assert result.tolist() == [True, None, True, False, False, False]
 
 
 def test_isdigit():
     arr = nanopd.StringArray(["foo", None, "üàéµ", "bar!!", "42", " "])
     result = arr.isdigit()
-    assert result.to_pylist() == [False, None, False, False, True, False]
+    assert result.tolist() == [False, None, False, False, True, False]
 
 
 def test_isspace():
     arr = nanopd.StringArray(["foo", None, "üàéµ", "bar!!", "42", " "])
     result = arr.isspace()
-    assert result.to_pylist() == [False, None, False, False, False, True]
+    assert result.tolist() == [False, None, False, False, False, True]
 
 
 def test_islower():
     arr = nanopd.StringArray(["FOO", None, "foo", "ÜÀÉΜ", "üàéµ"])
     result = arr.islower()
-    assert result.to_pylist() == [False, None, True, False, True]
+    assert result.tolist() == [False, None, True, False, True]
 
 
 def test_isupper():
     arr = nanopd.StringArray(["FOO", None, "foo", "ÜÀÉΜ", "üàéµ"])
     result = arr.isupper()
-    assert result.to_pylist() == [True, None, False, True, False]
+    assert result.tolist() == [True, None, False, True, False]
 
 
 def test_size():
