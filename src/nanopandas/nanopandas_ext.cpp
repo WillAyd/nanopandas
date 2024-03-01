@@ -9,6 +9,7 @@
 #include <nanobind/stl/vector.h>
 
 namespace nb = nanobind;
+using namespace nb::literals;
 
 // try to match all pandas methods
 // https://pandas.pydata.org/pandas-docs/stable/user_guide/text.html#method-summary
@@ -29,14 +30,15 @@ NB_MODULE(nanopandas_ext, m) {
       .def("__getitem__", &GetItemDunder<BoolArray>)
       .def("__eq__", &EqDunder<BoolArray>)
       .def("isna", &IsNA<BoolArray>)
-      .def("take", &Take<BoolArray>, nb::arg("indices"), nb::arg("allow_fill"),
-           nb::arg("fill_value").none())
+      .def("take", &Take<BoolArray>, "indices"_a, "allow_fill"_a = false,
+           "fill_value"_a = nb::none())
       .def("copy", &Copy<BoolArray>)
       .def("fillna", &FillNA<BoolArray>)
       .def("dropna", &DropNA<BoolArray>)
       .def("interpolate", &Interpolate<BoolArray>)
       .def("unique", &Unique<BoolArray>)
       .def("factorize", &Factorize<BoolArray>)
+      .def("reshape", &Reshape<BoolArray>)
       .def("_pad_or_backfill", &PadOrBackfill<BoolArray>)
       .def("_from_sequence", &FromSequence<BoolArray>)
       .def("_from_factorized", &FromFactorized<BoolArray>)
@@ -67,14 +69,15 @@ NB_MODULE(nanopandas_ext, m) {
       .def("__getitem__", &GetItemDunder<Int64Array>)
       .def("__eq__", &EqDunder<Int64Array>)
       .def("isna", &IsNA<Int64Array>)
-      .def("take", &Take<Int64Array>, nb::arg("indices"), nb::arg("allow_fill"),
-           nb::arg("fill_value").none())
+      .def("take", &Take<Int64Array>, "indices"_a, "allow_fill"_a = false,
+           "fill_value"_a = nb::none())
       .def("copy", &Copy<Int64Array>)
       .def("fillna", &FillNA<Int64Array>)
       .def("dropna", &DropNA<Int64Array>)
       .def("interpolate", &Interpolate<Int64Array>)
       .def("unique", &Unique<Int64Array>)
       .def("factorize", &Factorize<Int64Array>)
+      .def("reshape", &Reshape<Int64Array>)
       .def("_pad_or_backfill", &PadOrBackfill<Int64Array>)
       .def("_from_sequence", &FromSequence<Int64Array>)
       .def("_from_factorized", &FromFactorized<Int64Array>)
@@ -110,14 +113,15 @@ NB_MODULE(nanopandas_ext, m) {
       .def("__getitem__", &GetItemDunder<StringArray>)
       .def("__eq__", &EqDunder<StringArray>)
       .def("isna", &IsNA<StringArray>)
-      .def("take", &Take<StringArray>, nb::arg("indices"),
-           nb::arg("allow_fill"), nb::arg("fill_value").none())
+      .def("take", &Take<StringArray>, "indices"_a, "allow_fill"_a = false,
+           "fill_value"_a = nb::none())
       .def("copy", &Copy<StringArray>)
       .def("fillna", &FillNA<StringArray>)
       .def("dropna", &DropNA<StringArray>)
       .def("interpolate", &Interpolate<StringArray>)
       .def("unique", &Unique<StringArray>)
       .def("factorize", &Factorize<StringArray>)
+      .def("reshape", &Reshape<StringArray>)
       .def("_pad_or_backfill", &PadOrBackfill<StringArray>)
       .def("_from_sequence", &FromSequence<StringArray>)
       .def("_from_factorized", &FromFactorized<StringArray>)
@@ -139,7 +143,9 @@ NB_MODULE(nanopandas_ext, m) {
       // these are all assorted functions that do nothing but are required
       // for structural subtyping with a pandas extension array
       // See https://github.com/pandas-dev/pandas/pull/57634
-      .def_prop_ro("_typ", &NoOp)
+      .def_prop_ro(
+          "_typ",
+          []([[maybe_unused]] const StringArray &arr) { return "extension"; })
       .def_prop_ro("__pandas_priority__", &NoOp)
       .def_prop_ro("__hash__", &NoOp)
       .def("_from_scalars", &NoOp)
@@ -197,8 +203,30 @@ NB_MODULE(nanopandas_ext, m) {
       .def_prop_ro("na_value", &ExtensionDtype<StringArray>::NaValue)
       .def_prop_ro("kind", &ExtensionDtype<StringArray>::Kind)
       .def_prop_ro("name", &ExtensionDtype<StringArray>::Name)
-      .def_prop_ro("is_numeric", &ExtensionDtype<StringArray>::IsNumeric)
-      .def_prop_ro("is_boolean", &ExtensionDtype<StringArray>::IsBoolean)
+      .def_prop_ro("names", &ExtensionDtype<StringArray>::Names)
+      .def_prop_ro("_is_numeric", &ExtensionDtype<StringArray>::IsNumeric)
+      .def_prop_ro("_is_boolean", &ExtensionDtype<StringArray>::IsBoolean)
       .def_prop_ro("_can_hold_na", &ExtensionDtype<StringArray>::CanHoldNA)
-      .def_prop_ro("_is_immutable", &ExtensionDtype<StringArray>::IsImmutable);
+      .def_prop_ro("_is_immutable", &ExtensionDtype<StringArray>::IsImmutable)
+
+      // hacks for extensiondtype protocol
+      .def_prop_ro(
+          "type",
+          [](const ExtensionDtype<StringArray> &) { return nb::none(); })
+      .def("construct_array_type",
+           [](const ExtensionDtype<StringArray> &) { return; })
+      .def("empty", [](const ExtensionDtype<StringArray> &) { return; })
+      .def("construct_from_string",
+           [](const ExtensionDtype<StringArray> &) { return; })
+      .def("construct_from_string",
+           [](const ExtensionDtype<StringArray> &) { return; })
+      .def("is_dtype", [](const ExtensionDtype<StringArray> &) { return; })
+      .def("_get_common_dtype",
+           [](const ExtensionDtype<StringArray> &) { return; })
+      .def_prop_ro("index_class",
+                   [](const ExtensionDtype<StringArray> &) { return; })
+      .def_prop_ro("_supports_2d",
+                   [](const ExtensionDtype<StringArray> &) { return false; })
+      .def_prop_ro("_can_fast_transpose",
+                   [](const ExtensionDtype<StringArray> &) { return false; });
 }

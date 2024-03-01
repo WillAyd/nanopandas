@@ -5,6 +5,7 @@
 #include <optional>
 #include <set>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -298,7 +299,7 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
     auto idx = start;
 
     if (step > 0) {
-      while (idx <= stop) {
+      while (idx < stop) {
         if (const auto value = GetItemDunderInternal(self, idx)) {
           if (T::ArrowAppendFunc(result.get(), *value)) {
             throw std::runtime_error("Append call failed!");
@@ -528,12 +529,8 @@ template <typename T> BoolArray IsNA(const T &self) {
 }
 
 template <typename T>
-T Take(const T &self, const std::vector<int64_t> &indices, bool allow_fill,
-       nb::object fill_value) {
-  if ((allow_fill) && (fill_value.is_none())) {
-    throw std::invalid_argument("Expected non-None fill value");
-  }
-
+T Take(const T &self, const std::vector<int64_t> &indices,
+       bool allow_fill = false, nb::object fill_value = nb::none()) {
   nanoarrow::UniqueArray result;
   if (ArrowArrayInitFromType(result.get(), T::ArrowT)) {
     throw std::runtime_error("Unable to init output array for take!");
@@ -551,22 +548,36 @@ T Take(const T &self, const std::vector<int64_t> &indices, bool allow_fill,
 
   for (const auto index : indices) {
     if ((index >= n) || (index < -n)) {
-      throw std::range_error("index out of bounds!");
+      // special case for empty arrays
+      if (n == 0) {
+        if ((index >= 0) || !allow_fill) {
+          throw std::out_of_range(
+              "cannot do a non-empty take from an empty axes");
+        }
+      } else {
+        throw std::out_of_range("index out of bounds!");
+      }
     }
 
     if (allow_fill) { // negative values are missing values
       if (index < 0) {
-        auto filler = nb::cast<typename T::ScalarT>(fill_value);
-        if constexpr (std::is_same_v<T, StringArray>) {
-          struct ArrowStringView sv {
-            filler.data(), static_cast<int64_t>(filler.size())
-          };
-          if (T::ArrowAppendFunc(result.get(), sv)) {
-            throw std::runtime_error("Append call failed!");
+        if (fill_value.is_none()) {
+          if (ArrowArrayAppendNull(result.get(), 1)) {
+            throw std::runtime_error("failed to append null!");
           }
         } else {
-          if (T::ArrowAppendFunc(result.get(), filler)) {
-            throw std::runtime_error("Append call failed!");
+          auto filler = nb::cast<typename T::ScalarT>(fill_value);
+          if constexpr (std::is_same_v<T, StringArray>) {
+            struct ArrowStringView sv {
+              filler.data(), static_cast<int64_t>(filler.size())
+            };
+            if (T::ArrowAppendFunc(result.get(), sv)) {
+              throw std::runtime_error("Append call failed!");
+            }
+          } else {
+            if (T::ArrowAppendFunc(result.get(), filler)) {
+              throw std::runtime_error("Append call failed!");
+            }
           }
         }
       } else { // has value - no fill needed
@@ -1228,3 +1239,9 @@ BoolArray ConcatSameType(const BoolArray &self, const BoolArray &other);
 
 template <>
 StringArray ConcatSameType(const StringArray &self, const StringArray &other);
+
+template <typename T>
+auto Reshape([[maybe_unused]] const T &self, [[maybe_unused]] nb::object shape)
+    -> nb::object {
+  return nb::not_implemented();
+}

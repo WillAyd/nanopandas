@@ -272,6 +272,8 @@ public:
 
   auto Name() const -> const char * { return name; }
 
+  auto Names() const -> nb::object { return nb::none(); }
+
   auto IsNumeric() const -> bool {
     if constexpr (std::is_same_v<T, Int64Array>) {
       return true;
