@@ -244,35 +244,20 @@ auto GetItemDunder(const T &self, nb::object indexer) -> nb::object {
   nb::slice sliceobj;
   if (nb::try_cast(indexer, sliceobj, false)) {
     const auto converted_slice = sliceobj.compute(self.array_view_->length);
-    const auto [start, stop, step, _] = converted_slice;
-    auto idx = start;
+    const auto [start, _, step, slice_length] = converted_slice;
 
-    if (step > 0) {
-      while (idx <= stop) {
-        if (const auto value = GetItemDunderInternal(self, idx)) {
-          if (T::ArrowAppendFunc(result.get(), *value)) {
-            throw std::runtime_error("Append call failed!");
-          }
-        } else {
-          if (ArrowArrayAppendNull(result.get(), 1)) {
-            throw std::runtime_error("failed to append null!");
-          }
+    auto idx = start;
+    for (size_t i = 0; i < slice_length; i++) {
+      if (const auto value = GetItemDunderInternal(self, idx)) {
+        if (T::ArrowAppendFunc(result.get(), *value)) {
+          throw std::runtime_error("Append call failed!");
         }
-        idx += step;
-      }
-    } else { // negative step size
-      while (idx > stop) {
-        if (const auto value = GetItemDunderInternal(self, idx)) {
-          if (T::ArrowAppendFunc(result.get(), *value)) {
-            throw std::runtime_error("Append call failed!");
-          }
-        } else {
-          if (ArrowArrayAppendNull(result.get(), 1)) {
-            throw std::runtime_error("failed to append null!");
-          }
+      } else {
+        if (ArrowArrayAppendNull(result.get(), 1)) {
+          throw std::runtime_error("failed to append null!");
         }
-        idx += step;
       }
+      idx += step;
     }
 
     struct ArrowError error;
