@@ -41,7 +41,7 @@ NB_MODULE(nanopandas_ext, m) {
       .def("to_pylist", &ToPyList<BoolArray>)
       .def("_concat_same_type", &ConcatSameType<BoolArray>);
 
-  nb::class_<ExtensionDtype<BoolArray>>(m, "StringDtype")
+  nb::class_<ExtensionDtype<BoolArray>>(m, "BoolDtype")
       .def("__str__", &ExtensionDtype<BoolArray>::Str)
       .def_prop_ro("na_value", &ExtensionDtype<BoolArray>::NaValue)
       .def_prop_ro("kind", &ExtensionDtype<BoolArray>::Kind)
@@ -83,7 +83,7 @@ NB_MODULE(nanopandas_ext, m) {
       .def("min", &Min<Int64Array>)
       .def("max", &Max<Int64Array>);
 
-  nb::class_<ExtensionDtype<Int64Array>>(m, "StringDtype")
+  nb::class_<ExtensionDtype<Int64Array>>(m, "Int64Dtype")
       .def("__str__", &ExtensionDtype<Int64Array>::Str)
       .def_prop_ro("na_value", &ExtensionDtype<Int64Array>::NaValue)
       .def_prop_ro("kind", &ExtensionDtype<Int64Array>::Kind)
