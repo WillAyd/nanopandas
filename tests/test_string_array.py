@@ -34,13 +34,19 @@ def test_getitem():
 def test_getitem_slice():
     arr = nanopd.StringArray(["foo", None, "bar", "baz"])
     result = arr[:2]
-    assert len(result) == 3
+    assert len(result) == 2
     assert result[0] == "foo"
     assert result[1] is None
-    assert result[2] == "bar"
+
+def test_getitem_slice_neg_start():
+    arr = nanopd.StringArray(["foo", None, "bar", "baz"])
+    result = arr[-2:]
+    assert len(result) == 2
+    assert result[0] == "bar"
+    assert result[1] == "baz"
 
 
-def test_getitem_slice_neg():
+def test_getitem_slice_neg_step():
     arr = nanopd.StringArray(["foo", None, "bar", "baz"])
     result = arr[2:0:-1]
     assert len(result) == 2
@@ -254,7 +260,7 @@ def test_size():
 
 def test_null_count():
     arr = nanopd.StringArray(["FOO", None, "foo", "ÜÀÉΜ", "üàéµ"])
-    assert arr.null_count = 1
+    assert arr.null_count == 1
 
 def test_any():
     arr = nanopd.StringArray(["FOO", None, "foo", "ÜÀÉΜ", "üàéµ"])
