@@ -162,7 +162,7 @@ ApplyUtf8ProcFunction(const struct ArrowArrayView *array_view,
 
   for (int64_t i = 0; i < n; i++) {
     if (ArrowArrayViewIsNull(array_view, i)) {
-      if (ArrowArrayAppendNull(result.get(), i)) {
+      if (ArrowArrayAppendNull(result.get(), 1)) {
         throw std::runtime_error("failed to append null!");
       }
     } else {
