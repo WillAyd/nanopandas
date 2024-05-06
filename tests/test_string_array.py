@@ -252,6 +252,10 @@ def test_size():
     assert arr.size == 5
 
 
+def test_null_count():
+    arr = nanopd.StringArray(["FOO", None, "foo", "ÜÀÉΜ", "üàéµ"])
+    assert arr.null_count = 1
+
 def test_any():
     arr = nanopd.StringArray(["FOO", None, "foo", "ÜÀÉΜ", "üàéµ"])
     assert arr.any() == True
