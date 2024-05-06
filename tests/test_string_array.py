@@ -223,6 +223,12 @@ def test_isalnum():
     assert result.to_pylist() == [True, None, True, False, True, False]
 
 
+def test_isalnum_trailing_nones():
+    arr = nanopd.StringArray(["a", "bbbbb", "cc", None])
+    result = arr.isalnum()
+    assert result.to_pylist() == [True, True, True, None]
+
+
 def test_isalpha():
     arr = nanopd.StringArray(["foo", None, "üàéµ", "bar!!", "42", " "])
     result = arr.isalpha()
