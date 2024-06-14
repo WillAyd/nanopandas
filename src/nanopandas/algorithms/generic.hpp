@@ -32,7 +32,7 @@ static int InvertInplace(uint8_t *buf, size_t nbytes) {
   }
 
   for (size_t i = 0; i < rem; i++) {
-    int64_t value;
+    uint8_t value;
     memcpy(&value, cursor, sizeof(uint8_t));
     value = ~value;
     memcpy(cursor, &value, sizeof(uint8_t));
